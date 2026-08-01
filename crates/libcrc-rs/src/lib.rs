@@ -27,11 +27,28 @@
 //! initialisation (`if (!crc_tab16_init) init_crc16_tab();`) is unsynchronised, with no
 //! atomics or locks anywhere in the library — undefined behaviour under C11 §5.1.2.4
 //! when two threads first call a CRC function concurrently.
+//!
+//! # Bulk inputs are folded eight bytes at a time
+//!
+//! libcrc's inner loop folds one byte per iteration, and each table load depends on the
+//! previous one, so it runs at L1 latency regardless of how wide the machine is. On
+//! inputs long enough to matter, this crate instead uses **slice-by-8**: eight bytes per
+//! iteration through eight independent tables, all of them built by `const fn` at
+//! compile time like the others, and all in safe Rust — no `unsafe`, no intrinsics, no
+//! `target_feature`. Short inputs keep the byte-at-a-time loop, and so does the tail of
+//! every long one; the crossover is measured, not guessed. See [`slice8`] for the
+//! derivation, the exact memory cost, and why `crc_sick` is excluded.
+//!
+//! The extra tables cost 23 KiB of `.rodata`, which is free on a server and expensive on
+//! a microcontroller, so they sit behind the default-on `slice8` cargo feature. Building
+//! with `--no-default-features` restores libcrc's original byte-at-a-time behaviour
+//! exactly and emits none of them.
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 
 mod combine;
 mod digest;
+mod slice8;
 mod tables;
 
 pub use combine::{
@@ -241,9 +258,17 @@ pub const fn update_crc_sick(crc: u16, byte: u8, prev_byte: u8) -> u16 {
 // One-shot API — takes slices, not pointer+length
 // ===========================================================================
 
+// Each one-shot function below has the same two-part shape: hand the buffer to the
+// slice-by-8 accelerator, which folds whole 8-byte blocks and hands back what it could
+// not use, then finish those leftover bytes with libcrc's own byte-at-a-time step. With
+// the `slice8` feature off, the accelerator returns the buffer untouched and the second
+// half folds all of it — the original loop, unchanged. There is exactly one copy of each
+// finalisation rule either way.
+
 /// CRC-8, Sensirion SHT7x table. libcrc `crc_8()`.
 pub fn crc_8(data: &[u8]) -> u8 {
-    data.iter().fold(START_8, |crc, &b| update_crc_8(crc, b))
+    let (crc, tail) = slice8::fold_8(START_8, data);
+    tail.iter().fold(crc, |crc, &b| update_crc_8(crc, b))
 }
 
 /// CRC-16/ARC. libcrc `crc_16()`. Check value for `b"123456789"` is `0xBB3D`.
@@ -257,16 +282,19 @@ pub fn crc_modbus(data: &[u8]) -> u16 {
 }
 
 fn fold_16(start: u16, data: &[u8]) -> u16 {
-    data.iter().fold(start, |crc, &b| update_crc_16(crc, b))
+    let (crc, tail) = slice8::fold_16(start, data);
+    tail.iter().fold(crc, |crc, &b| update_crc_16(crc, b))
 }
 
 /// CRC-32. libcrc `crc_32()`. Check value is `0xCBF43926`.
 pub fn crc_32(data: &[u8]) -> u32 {
-    data.iter().fold(START_32, |crc, &b| update_crc_32(crc, b)) ^ 0xFFFF_FFFF
+    let (crc, tail) = slice8::fold_32(START_32, data);
+    tail.iter().fold(crc, |crc, &b| update_crc_32(crc, b)) ^ 0xFFFF_FFFF
 }
 
 fn fold_ccitt(start: u16, data: &[u8]) -> u16 {
-    data.iter().fold(start, |crc, &b| update_crc_ccitt(crc, b))
+    let (crc, tail) = slice8::fold_ccitt(start, data);
+    tail.iter().fold(crc, |crc, &b| update_crc_ccitt(crc, b))
 }
 
 /// CRC-CCITT seeded with `0x1D0F`. libcrc `crc_ccitt_1d0f()`. Check value is `0xE5CC`.
@@ -289,10 +317,8 @@ pub fn crc_xmodem(data: &[u8]) -> u16 {
 /// Byte-swaps the final value, diverging from the RevEng catalogue: libcrc returns
 /// `0x8921` for `b"123456789"` where the catalogue specifies `0x2189`.
 pub fn crc_kermit(data: &[u8]) -> u16 {
-    byteswap(
-        data.iter()
-            .fold(START_KERMIT, |crc, &b| update_crc_kermit(crc, b)),
-    )
+    let (crc, tail) = slice8::fold_kermit(START_KERMIT, data);
+    byteswap(tail.iter().fold(crc, |crc, &b| update_crc_kermit(crc, b)))
 }
 
 /// CRC-16/DNP. libcrc `crc_dnp()`.
@@ -300,11 +326,8 @@ pub fn crc_kermit(data: &[u8]) -> u16 {
 /// Complements *then* byte-swaps, diverging from the RevEng catalogue: libcrc returns
 /// `0x82EA` for `b"123456789"` where the catalogue specifies `0xEA82`.
 pub fn crc_dnp(data: &[u8]) -> u16 {
-    byteswap(
-        !data
-            .iter()
-            .fold(START_DNP, |crc, &b| update_crc_dnp(crc, b)),
-    )
+    let (crc, tail) = slice8::fold_dnp(START_DNP, data);
+    byteswap(!tail.iter().fold(crc, |crc, &b| update_crc_dnp(crc, b)))
 }
 
 /// CRC-16/SICK. libcrc `crc_sick()`. Check value is `0x56A6`.
@@ -312,6 +335,13 @@ pub fn crc_dnp(data: &[u8]) -> u16 {
 /// Bitwise rather than table-driven, and each step mixes in the *previous* byte. There
 /// is no RevEng catalogue entry for this algorithm, so its only reference is libcrc
 /// itself — correctness rests entirely on byte-for-byte differential parity.
+///
+/// **Not accelerated, and cannot be.** Slice-by-8 needs the message to be consumed as a
+/// stream of independent bytes so that each byte's contribution can be precomputed into
+/// a table and the eight contributions XORed together. Here byte *i* is mixed in
+/// together with byte *i-1*, so its contribution depends on its neighbour and no such
+/// per-byte table exists. See [`slice8`] for the derivation this violates. `crc_sick`
+/// keeps the exact loop it always had.
 pub fn crc_sick(data: &[u8]) -> u16 {
     // Carries the previous byte alongside the CRC; `0` for the first byte.
     let (crc, _) = data.iter().fold((START_SICK, 0u8), |(crc, prev), &b| {

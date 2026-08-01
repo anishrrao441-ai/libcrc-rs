@@ -7,3 +7,14 @@ description = "Idiomatic, zero-unsafe Rust port of lammertb/libcrc"
 
 [lib]
 crate-type = ["rlib"]
+
+[features]
+default = ["slice8"]
+
+# Slice-by-8 bulk folding: eight bytes per iteration instead of one, in safe Rust.
+# Costs 23 KiB of .rodata for the derived tables (see src/slice8.rs for the exact
+# per-algorithm breakdown), which is free on a server and expensive on a
+# microcontroller — libcrc's actual audience. Hence a feature rather than a
+# hard-coded choice. `--no-default-features` restores the byte-at-a-time loop
+# exactly and emits none of the tables. Both configurations are tested.
+slice8 = []
