@@ -1,0 +1,13 @@
+[package]
+name = "libcrc-cabi"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "C ABI shim so the UNMODIFIED original libcrc test suite can link against the Rust port. Not part of the port itself."
+
+[lib]
+name = "crc"
+crate-type = ["staticlib"]
+
+[dependencies]
+libcrc-rs = { path = "../libcrc-rs" }
