@@ -12,11 +12,16 @@ the prose.
 
 ```
 $ grep -rn "unsafe" crates/libcrc-rs/src/
-crates/libcrc-rs/src/lib.rs:33:#![forbid(unsafe_code)]
+crates/libcrc-rs/src/lib.rs:1://! A zero-unsafe, `no_std` Rust port of [lammertb/libcrc](...)
+crates/libcrc-rs/src/lib.rs:31:#![forbid(unsafe_code)]
+
+$ grep -rnE "unsafe[[:space:]]*\{|unsafe fn|unsafe impl|unsafe trait" crates/libcrc-rs/
+(no output)
 ```
 
-The only match is the attribute that bans it. Zero `unsafe` blocks, zero `unsafe fn`,
-zero `unsafe impl`.
+Two textual matches: a doc comment, and the attribute that bans it. The second command
+looks for actual constructs and finds none — **zero `unsafe` blocks, zero `unsafe fn`,
+zero `unsafe impl`, zero `unsafe trait`.**
 
 ### This is compiler-enforced, not a claim
 
