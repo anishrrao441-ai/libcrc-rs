@@ -1,0 +1,6649 @@
+{
+  "schema": "portmortem-2026/bench/results.json v1",
+  "generated_utc": "2026-08-01T07:41:19.200Z",
+  "subject": {
+    "port": "libcrc-rs (Rust) — crates/libcrc-rs",
+    "original": "lammertb/libcrc (C) — built in the gitignored oracle/ tree"
+  },
+  "configurations": {
+    "c-shipped": {
+      "what": "bench/c/bench_c.c linked against oracle/lib/libcrc.a exactly as `mingw32-make OS=posix CC=gcc EXEEXT=.exe` builds it",
+      "library_flags": "-Wall -Wextra -Wstrict-prototypes -Wshadow -Wpointer-arith -Wcast-qual -Wcast-align -Wwrite-strings -Wredundant-decls -Wnested-externs -Werror -O3 -funsigned-char (libcrc's own Makefile CFLAGS)",
+      "driver_flags": "-O3 -funsigned-char -Wall -Wextra -std=c99",
+      "lto": false,
+      "note": "The baseline a real libcrc user gets today."
+    },
+    "c-lto": {
+      "what": "same driver, libcrc sources recompiled at -O3 -funsigned-char -flto and link-time-optimised with the driver",
+      "driver_flags": "-O3 -funsigned-char -Wall -Wextra -std=c99 -flto",
+      "lto": true,
+      "note": "The fair upper bound for C: gives the C compiler the same cross-module inlining the port gets from lto=true. Not what libcrc ships."
+    },
+    "rust-cabi": {
+      "what": "THE SAME C DRIVER, same gcc, same flags, linked against target/release/libcrc.a (the port, through its C ABI)",
+      "driver_flags": "-O3 -funsigned-char -Wall -Wextra -std=c99 -DNO_UPDATE_API",
+      "lto": "within the Rust staticlib only; no cross-language LTO",
+      "note": "The controlled experiment. Driver source, compiler, flags, clock and link model are identical to c-shipped; the ONLY variable is the library. Incremental (bytewise) workloads are absent because the port's C ABI shim exports the 13 symbols the original test suite needs, not libcrc's update_crc_* family."
+    },
+    "rust-native": {
+      "what": "bench/rust — Rust driver calling libcrc-rs directly",
+      "driver_flags": "opt-level=3, lto=true, codegen-units=1 (mirrors the port's own [profile.release])",
+      "lto": true,
+      "note": "What a Rust consumer of the port actually gets."
+    }
+  },
+  "methodology_pointer": "bench/methodology.md",
+  "percentile_convention": "nearest-rank, index = ceil(p/100 * N) - 1, no interpolation",
+  "clock": {
+    "c_driver": {
+      "qpc_hz": "10000000",
+      "min_nonzero_delta_ticks": "1",
+      "min_nonzero_delta_ns": "100.0"
+    },
+    "rust_driver": {
+      "min_nonzero_delta_ns": "100",
+      "implied_hz": "10000000"
+    }
+  },
+  "equivalence_cross_check": {
+    "what": "every configuration prints an XOR fold of six CRCs over the same deterministic buffer before any timing is reported",
+    "minimal_1KiB": "303169684 (identical across all four configurations)",
+    "work1MiB": "3785426264248391083 (identical across all four configurations)",
+    "why": "if two configurations ever print different folds they are not computing the same function and the benchmark is meaningless; this check runs on every invocation"
+  },
+  "rss_instrument": {
+    "how": "bench/tools/rssrun.c: CreateProcess -> WaitForSingleObject -> GetProcessMemoryInfo on the still-open process handle. Not sampling — the kernel's lifetime peak counters, read after exit.",
+    "why_not_polling": "Get-Process polling races processes that live for tens of milliseconds; a 100 MiB allocate-and-free can happen entirely between two samples.",
+    "validation": "rssrun reports ~3.4 MB for the `minimal` profile and ~107.8 MB for `work100m`, a delta of ~104.4 MB against a known 104,857,600-byte allocation. The instrument resolves the allocation it is supposed to resolve.",
+    "common_mode": "the same instrument measures every configuration, so any bias it carries cancels in the comparison"
+  },
+  "binary_sizes": {
+    "driver_binary_bytes": {
+      "c-shipped": 164532,
+      "c-lto": 166805,
+      "rust-cabi": 1700210,
+      "rust-native": 435996
+    },
+    "static_library_bytes": {
+      "libcrc.a (C, oracle)": 22676,
+      "libcrc.a (Rust staticlib)": 4059142
+    }
+  },
+  "peak_rss": {
+    "minimal": {
+      "c-shipped": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 3411968,
+          "p50": 3416064,
+          "max": 3424256
+        },
+        "peak_working_set_kib_p50": 3336,
+        "peak_pagefile_kib_p50": 664,
+        "page_faults_p50": 877
+      },
+      "c-lto": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 3399680,
+          "p50": 3403776,
+          "max": 3416064
+        },
+        "peak_working_set_kib_p50": 3324,
+        "peak_pagefile_kib_p50": 640,
+        "page_faults_p50": 872
+      },
+      "rust-cabi": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 3416064,
+          "p50": 3416064,
+          "max": 3420160
+        },
+        "peak_working_set_kib_p50": 3336,
+        "peak_pagefile_kib_p50": 640,
+        "page_faults_p50": 876
+      },
+      "rust-native": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 3448832,
+          "p50": 3452928,
+          "max": 3465216
+        },
+        "peak_working_set_kib_p50": 3372,
+        "peak_pagefile_kib_p50": 640,
+        "page_faults_p50": 885
+      }
+    },
+    "work1m": {
+      "c-shipped": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 3969024,
+          "p50": 3969024,
+          "max": 3969024
+        },
+        "peak_working_set_kib_p50": 3876,
+        "peak_pagefile_kib_p50": 1584,
+        "page_faults_p50": 1131
+      },
+      "c-lto": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 3952640,
+          "p50": 3956736,
+          "max": 3960832
+        },
+        "peak_working_set_kib_p50": 3864,
+        "peak_pagefile_kib_p50": 1568,
+        "page_faults_p50": 1127
+      },
+      "rust-cabi": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 3973120,
+          "p50": 3977216,
+          "max": 3989504
+        },
+        "peak_working_set_kib_p50": 3884,
+        "peak_pagefile_kib_p50": 1580,
+        "page_faults_p50": 1135
+      },
+      "rust-native": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 4005888,
+          "p50": 4009984,
+          "max": 4009984
+        },
+        "peak_working_set_kib_p50": 3916,
+        "peak_pagefile_kib_p50": 1576,
+        "page_faults_p50": 1142
+      }
+    },
+    "work100m": {
+      "c-shipped": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 107778048,
+          "p50": 107778048,
+          "max": 107778048
+        },
+        "peak_working_set_kib_p50": 105252,
+        "peak_pagefile_kib_p50": 103164,
+        "page_faults_p50": 26526
+      },
+      "c-lto": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 107765760,
+          "p50": 107769856,
+          "max": 107769856
+        },
+        "peak_working_set_kib_p50": 105244,
+        "peak_pagefile_kib_p50": 103124,
+        "page_faults_p50": 26522
+      },
+      "rust-cabi": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 107786240,
+          "p50": 107786240,
+          "max": 107790336
+        },
+        "peak_working_set_kib_p50": 105260,
+        "peak_pagefile_kib_p50": 103136,
+        "page_faults_p50": 26528
+      },
+      "rust-native": {
+        "runs": 5,
+        "peak_working_set_bytes": {
+          "min": 107819008,
+          "p50": 107819008,
+          "max": 107819008
+        },
+        "peak_working_set_kib_p50": 105292,
+        "peak_pagefile_kib_p50": 103124,
+        "page_faults_p50": 26535
+      }
+    }
+  },
+  "startup_noop": null,
+  "end_to_end_1mib_job": null,
+  "cold_first_call": null,
+  "workloads": [
+    {
+      "kind": "bytewise",
+      "algo": "crc_16",
+      "bytes": 65536,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 213600,
+            "p50": 236400,
+            "p90": 242700,
+            "p99": 1540000,
+            "max": 2578800,
+            "mean": 266789.333,
+            "stddev": 219964.663,
+            "cv_pct": 82.45
+          },
+          "mib_per_s_at_p50": 264.4,
+          "ns_per_byte_at_p50": 3.6072
+        },
+        "c-lto": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 156700,
+            "p50": 156800,
+            "p90": 160450,
+            "p99": 187550,
+            "max": 194550,
+            "mean": 158796.333,
+            "stddev": 5740.412,
+            "cv_pct": 3.61
+          },
+          "mib_per_s_at_p50": 398.6,
+          "ns_per_byte_at_p50": 2.3926
+        },
+        "rust-native": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 170750,
+            "p50": 172200,
+            "p90": 182800,
+            "p99": 452300,
+            "max": 5288450,
+            "mean": 203499.5,
+            "stddev": 323574.176,
+            "cv_pct": 159
+          },
+          "mib_per_s_at_p50": 363,
+          "ns_per_byte_at_p50": 2.6276
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 0.911,
+        "rust-native_over_c-shipped": 1.373
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 0.415
+      }
+    },
+    {
+      "kind": "bytewise",
+      "algo": "crc_32",
+      "bytes": 65536,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 166100,
+            "p50": 167900,
+            "p90": 178750,
+            "p99": 414000,
+            "max": 583650,
+            "mean": 176306.333,
+            "stddev": 39339.479,
+            "cv_pct": 22.31
+          },
+          "mib_per_s_at_p50": 372.2,
+          "ns_per_byte_at_p50": 2.562
+        },
+        "c-lto": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 156700,
+            "p50": 157700,
+            "p90": 171750,
+            "p99": 205650,
+            "max": 227700,
+            "mean": 161716,
+            "stddev": 9388.598,
+            "cv_pct": 5.81
+          },
+          "mib_per_s_at_p50": 396.3,
+          "ns_per_byte_at_p50": 2.4063
+        },
+        "rust-native": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 161050,
+            "p50": 163250,
+            "p90": 166100,
+            "p99": 230900,
+            "max": 421200,
+            "mean": 166226.167,
+            "stddev": 17559.822,
+            "cv_pct": 10.56
+          },
+          "mib_per_s_at_p50": 382.8,
+          "ns_per_byte_at_p50": 2.491
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 0.966,
+        "rust-native_over_c-shipped": 1.028
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 0.891
+      }
+    },
+    {
+      "kind": "bytewise",
+      "algo": "crc_64",
+      "bytes": 65536,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 154800,
+            "p50": 160050,
+            "p90": 163150,
+            "p99": 203050,
+            "max": 214800,
+            "mean": 161735.833,
+            "stddev": 8088.105,
+            "cv_pct": 5
+          },
+          "mib_per_s_at_p50": 390.5,
+          "ns_per_byte_at_p50": 2.4422
+        },
+        "c-lto": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 154600,
+            "p50": 155750,
+            "p90": 170050,
+            "p99": 221750,
+            "max": 354700,
+            "mean": 160650.333,
+            "stddev": 15656.473,
+            "cv_pct": 9.75
+          },
+          "mib_per_s_at_p50": 401.3,
+          "ns_per_byte_at_p50": 2.3766
+        },
+        "rust-native": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 159350,
+            "p50": 160150,
+            "p90": 162750,
+            "p99": 190700,
+            "max": 223700,
+            "mean": 161678,
+            "stddev": 6378.915,
+            "cv_pct": 3.95
+          },
+          "mib_per_s_at_p50": 390.3,
+          "ns_per_byte_at_p50": 2.4437
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 0.973,
+        "rust-native_over_c-shipped": 0.999
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 1.163
+      }
+    },
+    {
+      "kind": "bytewise",
+      "algo": "crc_8",
+      "bytes": 65536,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 139450,
+            "p50": 140900,
+            "p90": 166600,
+            "p99": 1389950,
+            "max": 2036700,
+            "mean": 190522.667,
+            "stddev": 234555.469,
+            "cv_pct": 123.11
+          },
+          "mib_per_s_at_p50": 443.6,
+          "ns_per_byte_at_p50": 2.15
+        },
+        "c-lto": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 135200,
+            "p50": 139500,
+            "p90": 146650,
+            "p99": 172800,
+            "max": 201350,
+            "mean": 141649.167,
+            "stddev": 7425.577,
+            "cv_pct": 5.24
+          },
+          "mib_per_s_at_p50": 448,
+          "ns_per_byte_at_p50": 2.1286
+        },
+        "rust-native": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 135250,
+            "p50": 140150,
+            "p90": 142150,
+            "p99": 155000,
+            "max": 258850,
+            "mean": 141015,
+            "stddev": 9875.965,
+            "cv_pct": 7
+          },
+          "mib_per_s_at_p50": 446,
+          "ns_per_byte_at_p50": 2.1385
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 0.995,
+        "rust-native_over_c-shipped": 1.005
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 1.115
+      }
+    },
+    {
+      "kind": "bytewise",
+      "algo": "crc_ccitt",
+      "bytes": 65536,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 180600,
+            "p50": 181900,
+            "p90": 186400,
+            "p99": 469100,
+            "max": 1679800,
+            "mean": 193741,
+            "stddev": 101776.46,
+            "cv_pct": 52.53
+          },
+          "mib_per_s_at_p50": 343.6,
+          "ns_per_byte_at_p50": 2.7756
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 154500,
+            "p50": 154700,
+            "p90": 184300,
+            "p99": 197600,
+            "max": 435700,
+            "mean": 161117,
+            "stddev": 19338.309,
+            "cv_pct": 12
+          },
+          "mib_per_s_at_p50": 404,
+          "ns_per_byte_at_p50": 2.3605
+        },
+        "rust-native": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 179250,
+            "p50": 180300,
+            "p90": 182650,
+            "p99": 258100,
+            "max": 599950,
+            "mean": 184823.333,
+            "stddev": 32940.294,
+            "cv_pct": 17.82
+          },
+          "mib_per_s_at_p50": 346.6,
+          "ns_per_byte_at_p50": 2.7512
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 0.858,
+        "rust-native_over_c-shipped": 1.009
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 0.766
+      }
+    },
+    {
+      "kind": "bytewise",
+      "algo": "crc_dnp",
+      "bytes": 65536,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 221200,
+            "p50": 249300,
+            "p90": 254000,
+            "p99": 400900,
+            "max": 452600,
+            "mean": 249319,
+            "stddev": 27356.506,
+            "cv_pct": 10.97
+          },
+          "mib_per_s_at_p50": 250.7,
+          "ns_per_byte_at_p50": 3.804
+        },
+        "c-lto": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 156700,
+            "p50": 161550,
+            "p90": 171950,
+            "p99": 225150,
+            "max": 384900,
+            "mean": 165123.667,
+            "stddev": 19126.023,
+            "cv_pct": 11.58
+          },
+          "mib_per_s_at_p50": 386.9,
+          "ns_per_byte_at_p50": 2.4651
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 170600,
+            "p50": 171300,
+            "p90": 174400,
+            "p99": 211700,
+            "max": 692200,
+            "mean": 174989,
+            "stddev": 32880.239,
+            "cv_pct": 18.79
+          },
+          "mib_per_s_at_p50": 364.9,
+          "ns_per_byte_at_p50": 2.6138
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 0.943,
+        "rust-native_over_c-shipped": 1.455
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 1.064
+      }
+    },
+    {
+      "kind": "bytewise",
+      "algo": "crc_kermit",
+      "bytes": 65536,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 213600,
+            "p50": 235800,
+            "p90": 241900,
+            "p99": 483200,
+            "max": 1379300,
+            "mean": 239290.667,
+            "stddev": 76431.201,
+            "cv_pct": 31.94
+          },
+          "mib_per_s_at_p50": 265.1,
+          "ns_per_byte_at_p50": 3.598
+        },
+        "c-lto": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 156700,
+            "p50": 156850,
+            "p90": 171750,
+            "p99": 205100,
+            "max": 328100,
+            "mean": 161346.333,
+            "stddev": 14401.993,
+            "cv_pct": 8.93
+          },
+          "mib_per_s_at_p50": 398.5,
+          "ns_per_byte_at_p50": 2.3933
+        },
+        "rust-native": {
+          "batch_calls": 2,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 170700,
+            "p50": 171750,
+            "p90": 176600,
+            "p99": 312950,
+            "max": 466400,
+            "mean": 177238,
+            "stddev": 26516.653,
+            "cv_pct": 14.96
+          },
+          "mib_per_s_at_p50": 363.9,
+          "ns_per_byte_at_p50": 2.6207
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 0.913,
+        "rust-native_over_c-shipped": 1.373
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 0.655
+      }
+    },
+    {
+      "kind": "bytewise",
+      "algo": "crc_sick",
+      "bytes": 65536,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 4,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 96675,
+            "p50": 96875,
+            "p90": 104325,
+            "p99": 125500,
+            "max": 146150,
+            "mean": 98846.083,
+            "stddev": 5416.244,
+            "cv_pct": 5.48
+          },
+          "mib_per_s_at_p50": 645.2,
+          "ns_per_byte_at_p50": 1.4782
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 241800,
+            "p50": 244700,
+            "p90": 273100,
+            "p99": 315900,
+            "max": 911300,
+            "mean": 254132,
+            "stddev": 41863.76,
+            "cv_pct": 16.47
+          },
+          "mib_per_s_at_p50": 255.4,
+          "ns_per_byte_at_p50": 3.7338
+        },
+        "rust-native": {
+          "batch_calls": 4,
+          "samples": 300,
+          "ns_per_call": {
+            "min": 77450,
+            "p50": 80700,
+            "p90": 81975,
+            "p99": 89075,
+            "max": 111675,
+            "mean": 80814.75,
+            "stddev": 2562.4,
+            "cv_pct": 3.17
+          },
+          "mib_per_s_at_p50": 774.5,
+          "ns_per_byte_at_p50": 1.2314
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 3.032,
+        "rust-native_over_c-shipped": 1.2
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": null,
+        "rust-native_over_c-lto": 3.546
+      }
+    },
+    {
+      "kind": "manysmall",
+      "algo": "crc_16",
+      "bytes": 100000,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 13090500,
+            "p50": 13305900,
+            "p90": 13684400,
+            "p99": 14271000,
+            "max": 14578300,
+            "mean": 13407409,
+            "stddev": 265799.405,
+            "cv_pct": 1.98
+          },
+          "ns_per_inner_call_at_p50": 133.059,
+          "mib_per_s_at_p50": 458.7
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 15010300,
+            "p50": 15191900,
+            "p90": 15692400,
+            "p99": 16207700,
+            "max": 16225600,
+            "mean": 15315154,
+            "stddev": 285985.7,
+            "cv_pct": 1.87
+          },
+          "ns_per_inner_call_at_p50": 151.919,
+          "mib_per_s_at_p50": 401.8
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 14197700,
+            "p50": 14781500,
+            "p90": 15826100,
+            "p99": 18152800,
+            "max": 18732600,
+            "mean": 15091794,
+            "stddev": 811421.803,
+            "cv_pct": 5.38
+          },
+          "ns_per_inner_call_at_p50": 147.815,
+          "mib_per_s_at_p50": 412.9
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 14037400,
+            "p50": 14424600,
+            "p90": 14895000,
+            "p99": 16592400,
+            "max": 23560400,
+            "mean": 14605738,
+            "stddev": 1024391.451,
+            "cv_pct": 7.01
+          },
+          "ns_per_inner_call_at_p50": 144.246,
+          "mib_per_s_at_p50": 423.1
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.9,
+        "rust-native_over_c-lto": 1.053,
+        "rust-native_over_c-shipped": 0.922
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.786,
+        "rust-native_over_c-lto": 0.977
+      }
+    },
+    {
+      "kind": "manysmall",
+      "algo": "crc_32",
+      "bytes": 100000,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 12853000,
+            "p50": 13921500,
+            "p90": 17958700,
+            "p99": 33226400,
+            "max": 57875400,
+            "mean": 15710595,
+            "stddev": 5461972.534,
+            "cv_pct": 34.77
+          },
+          "ns_per_inner_call_at_p50": 139.215,
+          "mib_per_s_at_p50": 438.4
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 12795900,
+            "p50": 12959200,
+            "p90": 13506200,
+            "p99": 13795000,
+            "max": 13817300,
+            "mean": 13070788,
+            "stddev": 254609.171,
+            "cv_pct": 1.95
+          },
+          "ns_per_inner_call_at_p50": 129.592,
+          "mib_per_s_at_p50": 471
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 13555200,
+            "p50": 13821300,
+            "p90": 17477600,
+            "p99": 24082000,
+            "max": 56979500,
+            "mean": 14992803,
+            "stddev": 4606935.184,
+            "cv_pct": 30.73
+          },
+          "ns_per_inner_call_at_p50": 138.213,
+          "mib_per_s_at_p50": 441.6
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 12943300,
+            "p50": 13313700,
+            "p90": 13925300,
+            "p99": 15814400,
+            "max": 22074700,
+            "mean": 13547111,
+            "stddev": 972099.31,
+            "cv_pct": 7.18
+          },
+          "ns_per_inner_call_at_p50": 133.137,
+          "mib_per_s_at_p50": 458.4
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.007,
+        "rust-native_over_c-lto": 0.973,
+        "rust-native_over_c-shipped": 1.046
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.38,
+        "rust-native_over_c-lto": 0.872
+      }
+    },
+    {
+      "kind": "manysmall",
+      "algo": "crc_8",
+      "bytes": 100000,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 8351100,
+            "p50": 8447100,
+            "p90": 8967300,
+            "p99": 9331900,
+            "max": 9955500,
+            "mean": 8589678,
+            "stddev": 277764.173,
+            "cv_pct": 3.23
+          },
+          "ns_per_inner_call_at_p50": 84.471,
+          "mib_per_s_at_p50": 722.6
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 8143300,
+            "p50": 8274700,
+            "p90": 8663400,
+            "p99": 9288200,
+            "max": 10245900,
+            "mean": 8385704,
+            "stddev": 301428.127,
+            "cv_pct": 3.59
+          },
+          "ns_per_inner_call_at_p50": 82.747,
+          "mib_per_s_at_p50": 737.6
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 7551700,
+            "p50": 7812100,
+            "p90": 8401900,
+            "p99": 16728200,
+            "max": 51480600,
+            "mean": 8494452,
+            "stddev": 4494334.13,
+            "cv_pct": 52.91
+          },
+          "ns_per_inner_call_at_p50": 78.121,
+          "mib_per_s_at_p50": 781.3
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 8202700,
+            "p50": 8549000,
+            "p90": 8904800,
+            "p99": 9608000,
+            "max": 16822300,
+            "mean": 8677026,
+            "stddev": 861392.467,
+            "cv_pct": 9.93
+          },
+          "ns_per_inner_call_at_p50": 85.49,
+          "mib_per_s_at_p50": 713.9
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.081,
+        "rust-native_over_c-lto": 0.968,
+        "rust-native_over_c-shipped": 0.988
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.558,
+        "rust-native_over_c-lto": 0.967
+      }
+    },
+    {
+      "kind": "manysmall",
+      "algo": "crc_ccitt_ffff",
+      "bytes": 100000,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 14424700,
+            "p50": 15376400,
+            "p90": 15953400,
+            "p99": 16675500,
+            "max": 20766900,
+            "mean": 15452344,
+            "stddev": 719650.608,
+            "cv_pct": 4.66
+          },
+          "ns_per_inner_call_at_p50": 153.764,
+          "mib_per_s_at_p50": 396.9
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 14093600,
+            "p50": 14312500,
+            "p90": 14664500,
+            "p99": 14975300,
+            "max": 15166500,
+            "mean": 14368154,
+            "stddev": 214915.405,
+            "cv_pct": 1.5
+          },
+          "ns_per_inner_call_at_p50": 143.125,
+          "mib_per_s_at_p50": 426.4
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 17193400,
+            "p50": 18556900,
+            "p90": 22759000,
+            "p99": 37922200,
+            "max": 40939200,
+            "mean": 19777927,
+            "stddev": 3547842.381,
+            "cv_pct": 17.94
+          },
+          "ns_per_inner_call_at_p50": 185.569,
+          "mib_per_s_at_p50": 328.9
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 100,
+          "ns_per_call": {
+            "min": 17426700,
+            "p50": 17753100,
+            "p90": 19056600,
+            "p99": 23207300,
+            "max": 26683700,
+            "mean": 18173546,
+            "stddev": 1256093.611,
+            "cv_pct": 6.91
+          },
+          "ns_per_inner_call_at_p50": 177.531,
+          "mib_per_s_at_p50": 343.8
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.829,
+        "rust-native_over_c-lto": 0.806,
+        "rust-native_over_c-shipped": 0.866
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.44,
+        "rust-native_over_c-lto": 0.645
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "checksum_NMEA",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 727.148,
+            "p50": 735.547,
+            "p90": 795.313,
+            "p99": 938.086,
+            "max": 1174.609,
+            "mean": 753.182,
+            "stddev": 45.931,
+            "cv_pct": 6.1
+          },
+          "mib_per_s_at_p50": 1327.7,
+          "ns_per_byte_at_p50": 0.7183
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 714.453,
+            "p50": 742.773,
+            "p90": 759.375,
+            "p99": 1218.164,
+            "max": 2180.469,
+            "mean": 756.616,
+            "stddev": 92.727,
+            "cv_pct": 12.26
+          },
+          "mib_per_s_at_p50": 1314.8,
+          "ns_per_byte_at_p50": 0.7254
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 601.367,
+            "p50": 633.203,
+            "p90": 656.641,
+            "p99": 801.758,
+            "max": 1045.703,
+            "mean": 638.205,
+            "stddev": 36.263,
+            "cv_pct": 5.68
+          },
+          "mib_per_s_at_p50": 1542.3,
+          "ns_per_byte_at_p50": 0.6184
+        },
+        "rust-native": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 474.414,
+            "p50": 528.906,
+            "p90": 662.305,
+            "p99": 1833.984,
+            "max": 2552.734,
+            "mean": 600.116,
+            "stddev": 263.856,
+            "cv_pct": 43.97
+          },
+          "mib_per_s_at_p50": 1846.4,
+          "ns_per_byte_at_p50": 0.5165
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.162,
+        "rust-native_over_c-lto": 1.404,
+        "rust-native_over_c-shipped": 1.391
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.17,
+        "rust-native_over_c-lto": 0.664
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "checksum_NMEA",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 114.209,
+            "p50": 114.648,
+            "p90": 122.119,
+            "p99": 154.785,
+            "max": 182.764,
+            "mean": 117.352,
+            "stddev": 7.652,
+            "cv_pct": 6.52
+          },
+          "mib_per_s_at_p50": 133.1,
+          "ns_per_byte_at_p50": 7.1655
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 109.131,
+            "p50": 110.791,
+            "p90": 122.314,
+            "p99": 326.465,
+            "max": 1303.516,
+            "mean": 123.406,
+            "stddev": 78.34,
+            "cv_pct": 63.48
+          },
+          "mib_per_s_at_p50": 137.7,
+          "ns_per_byte_at_p50": 6.9244
+        },
+        "rust-cabi": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 16.51,
+            "p50": 16.632,
+            "p90": 18.445,
+            "p99": 25.421,
+            "max": 341.412,
+            "mean": 18.009,
+            "stddev": 14.584,
+            "cv_pct": 80.98
+          },
+          "mib_per_s_at_p50": 917.4,
+          "ns_per_byte_at_p50": 1.0395
+        },
+        "rust-native": {
+          "batch_calls": 32768,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 9.143,
+            "p50": 9.46,
+            "p90": 10.483,
+            "p99": 16.91,
+            "max": 30.765,
+            "mean": 9.925,
+            "stddev": 1.701,
+            "cv_pct": 17.14
+          },
+          "mib_per_s_at_p50": 1612.9,
+          "ns_per_byte_at_p50": 0.5913
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 6.893,
+        "rust-native_over_c-lto": 11.712,
+        "rust-native_over_c-shipped": 12.119
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 6.089,
+        "rust-native_over_c-lto": 19.306
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "checksum_NMEA",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1024,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 276.66,
+            "p50": 280.469,
+            "p90": 308.789,
+            "p99": 358.887,
+            "max": 537.598,
+            "mean": 289.447,
+            "stddev": 22.041,
+            "cv_pct": 7.61
+          },
+          "mib_per_s_at_p50": 870.5,
+          "ns_per_byte_at_p50": 1.0956
+        },
+        "c-lto": {
+          "batch_calls": 1024,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 267.578,
+            "p50": 271.582,
+            "p90": 285.938,
+            "p99": 1567.48,
+            "max": 9049.219,
+            "mean": 330.394,
+            "stddev": 491.599,
+            "cv_pct": 148.79
+          },
+          "mib_per_s_at_p50": 899,
+          "ns_per_byte_at_p50": 1.0609
+        },
+        "rust-cabi": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 143.408,
+            "p50": 154.98,
+            "p90": 166.748,
+            "p99": 260.303,
+            "max": 364.6,
+            "mean": 155.829,
+            "stddev": 21.893,
+            "cv_pct": 14.05
+          },
+          "mib_per_s_at_p50": 1575.3,
+          "ns_per_byte_at_p50": 0.6054
+        },
+        "rust-native": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 117.334,
+            "p50": 117.969,
+            "p90": 134.521,
+            "p99": 242.139,
+            "max": 279.15,
+            "mean": 124.67,
+            "stddev": 18.061,
+            "cv_pct": 14.49
+          },
+          "mib_per_s_at_p50": 2069.5,
+          "ns_per_byte_at_p50": 0.4608
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.81,
+        "rust-native_over_c-lto": 2.302,
+        "rust-native_over_c-shipped": 2.377
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.379,
+        "rust-native_over_c-lto": 6.473
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "checksum_NMEA",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 150,
+            "p50": 151.025,
+            "p90": 152.344,
+            "p99": 181.396,
+            "max": 188.916,
+            "mean": 152.49,
+            "stddev": 5.294,
+            "cv_pct": 3.47
+          },
+          "mib_per_s_at_p50": 404.1,
+          "ns_per_byte_at_p50": 2.3598
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 136.621,
+            "p50": 142.236,
+            "p90": 151.025,
+            "p99": 179.785,
+            "max": 2495.947,
+            "mean": 148.805,
+            "stddev": 106.626,
+            "cv_pct": 71.65
+          },
+          "mib_per_s_at_p50": 429.1,
+          "ns_per_byte_at_p50": 2.2224
+        },
+        "rust-cabi": {
+          "batch_calls": 4096,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 42.261,
+            "p50": 42.749,
+            "p90": 50.757,
+            "p99": 158.765,
+            "max": 485.645,
+            "mean": 47.496,
+            "stddev": 28.608,
+            "cv_pct": 60.23
+          },
+          "mib_per_s_at_p50": 1427.8,
+          "ns_per_byte_at_p50": 0.668
+        },
+        "rust-native": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 31.592,
+            "p50": 31.641,
+            "p90": 47.559,
+            "p99": 53.857,
+            "max": 67.554,
+            "mean": 34.124,
+            "stddev": 6.077,
+            "cv_pct": 17.81
+          },
+          "mib_per_s_at_p50": 1929,
+          "ns_per_byte_at_p50": 0.4944
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 3.533,
+        "rust-native_over_c-lto": 4.495,
+        "rust-native_over_c-shipped": 4.773
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.143,
+        "rust-native_over_c-lto": 3.338
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_16",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2412.5,
+            "p50": 2414.844,
+            "p90": 2646.875,
+            "p99": 3314.063,
+            "max": 3546.094,
+            "mean": 2479.984,
+            "stddev": 174.174,
+            "cv_pct": 7.02
+          },
+          "mib_per_s_at_p50": 404.4,
+          "ns_per_byte_at_p50": 2.3582
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2784.375,
+            "p50": 2857.813,
+            "p90": 2933.594,
+            "p99": 25182.031,
+            "max": 261111.719,
+            "mean": 4454.353,
+            "stddev": 16523.179,
+            "cv_pct": 370.94
+          },
+          "mib_per_s_at_p50": 341.7,
+          "ns_per_byte_at_p50": 2.7908
+        },
+        "rust-cabi": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2571.094,
+            "p50": 2573.438,
+            "p90": 2578.125,
+            "p99": 3148.438,
+            "max": 4533.594,
+            "mean": 2598.519,
+            "stddev": 128.111,
+            "cv_pct": 4.93
+          },
+          "mib_per_s_at_p50": 379.5,
+          "ns_per_byte_at_p50": 2.5131
+        },
+        "rust-native": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2570.313,
+            "p50": 2572.656,
+            "p90": 2803.906,
+            "p99": 3533.594,
+            "max": 3975.781,
+            "mean": 2648.769,
+            "stddev": 186.025,
+            "cv_pct": 7.02
+          },
+          "mib_per_s_at_p50": 379.6,
+          "ns_per_byte_at_p50": 2.5124
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.938,
+        "rust-native_over_c-lto": 1.111,
+        "rust-native_over_c-shipped": 0.939
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.053,
+        "rust-native_over_c-lto": 7.126
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_16",
+      "bytes": 1048576,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2480700,
+            "p50": 2522900,
+            "p90": 2588700,
+            "p99": 3156700,
+            "max": 3410900,
+            "mean": 2539960,
+            "stddev": 102911.17,
+            "cv_pct": 4.05
+          },
+          "mib_per_s_at_p50": 396.4,
+          "ns_per_byte_at_p50": 2.406
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2867900,
+            "p50": 2902300,
+            "p90": 3029300,
+            "p99": 4892900,
+            "max": 8354000,
+            "mean": 2997408.5,
+            "stddev": 473918.269,
+            "cv_pct": 15.81
+          },
+          "mib_per_s_at_p50": 344.6,
+          "ns_per_byte_at_p50": 2.7678
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2654100,
+            "p50": 2656900,
+            "p90": 2775300,
+            "p99": 3009300,
+            "max": 3180000,
+            "mean": 2690558,
+            "stddev": 74818.267,
+            "cv_pct": 2.78
+          },
+          "mib_per_s_at_p50": 376.4,
+          "ns_per_byte_at_p50": 2.5338
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2658800,
+            "p50": 2720200,
+            "p90": 2910500,
+            "p99": 3906900,
+            "max": 8014700,
+            "mean": 2805300.5,
+            "stddev": 511156.305,
+            "cv_pct": 18.22
+          },
+          "mib_per_s_at_p50": 367.6,
+          "ns_per_byte_at_p50": 2.5942
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.95,
+        "rust-native_over_c-lto": 1.067,
+        "rust-native_over_c-shipped": 0.927
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.049,
+        "rust-native_over_c-lto": 1.252
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_16",
+      "bytes": 104857600,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 251205600,
+            "p50": 256739100,
+            "p90": 270695200,
+            "p99": 323577400,
+            "max": 323577400,
+            "mean": 260849776,
+            "stddev": 15829422.837,
+            "cv_pct": 6.07
+          },
+          "mib_per_s_at_p50": 389.5,
+          "ns_per_byte_at_p50": 2.4485
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 285053600,
+            "p50": 303325800,
+            "p90": 366230100,
+            "p99": 388065200,
+            "max": 388065200,
+            "mean": 314020524,
+            "stddev": 31511565.997,
+            "cv_pct": 10.03
+          },
+          "mib_per_s_at_p50": 329.7,
+          "ns_per_byte_at_p50": 2.8927
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 267871900,
+            "p50": 277715900,
+            "p90": 314860500,
+            "p99": 396234600,
+            "max": 396234600,
+            "mean": 288135352,
+            "stddev": 27162585.67,
+            "cv_pct": 9.43
+          },
+          "mib_per_s_at_p50": 360.1,
+          "ns_per_byte_at_p50": 2.6485
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 268852700,
+            "p50": 278528600,
+            "p90": 311871900,
+            "p99": 332410700,
+            "max": 332410700,
+            "mean": 284895624,
+            "stddev": 16277106.077,
+            "cv_pct": 5.71
+          },
+          "mib_per_s_at_p50": 359,
+          "ns_per_byte_at_p50": 2.6563
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.924,
+        "rust-native_over_c-lto": 1.089,
+        "rust-native_over_c-shipped": 0.922
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.817,
+        "rust-native_over_c-lto": 1.167
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_16",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.339,
+            "p50": 22.565,
+            "p90": 24.298,
+            "p99": 35.15,
+            "max": 116.65,
+            "mean": 23.618,
+            "stddev": 5.43,
+            "cv_pct": 22.99
+          },
+          "mib_per_s_at_p50": 676.2,
+          "ns_per_byte_at_p50": 1.4103
+        },
+        "c-lto": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 24.597,
+            "p50": 24.67,
+            "p90": 25.684,
+            "p99": 32.153,
+            "max": 39.233,
+            "mean": 25.185,
+            "stddev": 1.418,
+            "cv_pct": 5.63
+          },
+          "mib_per_s_at_p50": 618.5,
+          "ns_per_byte_at_p50": 1.5419
+        },
+        "rust-cabi": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 23.059,
+            "p50": 23.395,
+            "p90": 30.042,
+            "p99": 180.292,
+            "max": 2808.142,
+            "mean": 38.178,
+            "stddev": 140.209,
+            "cv_pct": 367.26
+          },
+          "mib_per_s_at_p50": 652.2,
+          "ns_per_byte_at_p50": 1.4622
+        },
+        "rust-native": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.217,
+            "p50": 22.925,
+            "p90": 23.157,
+            "p99": 30.884,
+            "max": 50.403,
+            "mean": 22.974,
+            "stddev": 2.105,
+            "cv_pct": 9.16
+          },
+          "mib_per_s_at_p50": 665.6,
+          "ns_per_byte_at_p50": 1.4328
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.965,
+        "rust-native_over_c-lto": 1.076,
+        "rust-native_over_c-shipped": 0.984
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.195,
+        "rust-native_over_c-lto": 1.041
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_16",
+      "bytes": 16777216,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 39929600,
+            "p50": 40321500,
+            "p90": 41280800,
+            "p99": 42770600,
+            "max": 42770600,
+            "mean": 40565540,
+            "stddev": 573539.707,
+            "cv_pct": 1.41
+          },
+          "mib_per_s_at_p50": 396.8,
+          "ns_per_byte_at_p50": 2.4033
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 45589200,
+            "p50": 48040300,
+            "p90": 54089200,
+            "p99": 81396300,
+            "max": 81396300,
+            "mean": 50187976.667,
+            "stddev": 6599174.968,
+            "cv_pct": 13.15
+          },
+          "mib_per_s_at_p50": 333.1,
+          "ns_per_byte_at_p50": 2.8634
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 42809400,
+            "p50": 43549300,
+            "p90": 44760300,
+            "p99": 113435500,
+            "max": 113435500,
+            "mean": 45225836.667,
+            "stddev": 9115636.877,
+            "cv_pct": 20.16
+          },
+          "mib_per_s_at_p50": 367.4,
+          "ns_per_byte_at_p50": 2.5957
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 42747400,
+            "p50": 43461300,
+            "p90": 44466700,
+            "p99": 45060200,
+            "max": 45060200,
+            "mean": 43583413.333,
+            "stddev": 584464.163,
+            "cv_pct": 1.34
+          },
+          "mib_per_s_at_p50": 368.1,
+          "ns_per_byte_at_p50": 2.5905
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.926,
+        "rust-native_over_c-lto": 1.105,
+        "rust-native_over_c-shipped": 0.928
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.377,
+        "rust-native_over_c-lto": 1.806
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_16",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 588.281,
+            "p50": 588.867,
+            "p90": 647.656,
+            "p99": 812.109,
+            "max": 1047.07,
+            "mean": 604.404,
+            "stddev": 45.678,
+            "cv_pct": 7.56
+          },
+          "mib_per_s_at_p50": 414.6,
+          "ns_per_byte_at_p50": 2.3003
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 673.633,
+            "p50": 698.438,
+            "p90": 731.836,
+            "p99": 826.953,
+            "max": 1951.172,
+            "mean": 705.721,
+            "stddev": 71.022,
+            "cv_pct": 10.06
+          },
+          "mib_per_s_at_p50": 349.6,
+          "ns_per_byte_at_p50": 2.7283
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 646.68,
+            "p50": 652.344,
+            "p90": 703.125,
+            "p99": 1762.305,
+            "max": 8030.469,
+            "mean": 709.361,
+            "stddev": 450.932,
+            "cv_pct": 63.57
+          },
+          "mib_per_s_at_p50": 374.3,
+          "ns_per_byte_at_p50": 2.5482
+        },
+        "rust-native": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 626.758,
+            "p50": 627.539,
+            "p90": 674.805,
+            "p99": 890.039,
+            "max": 1369.531,
+            "mean": 644.791,
+            "stddev": 59.873,
+            "cv_pct": 9.29
+          },
+          "mib_per_s_at_p50": 389,
+          "ns_per_byte_at_p50": 2.4513
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.903,
+        "rust-native_over_c-lto": 1.113,
+        "rust-native_over_c-shipped": 0.938
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.461,
+        "rust-native_over_c-lto": 0.929
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_16",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 129.98,
+            "p50": 130.811,
+            "p90": 139.893,
+            "p99": 178.516,
+            "max": 210.596,
+            "mean": 134.263,
+            "stddev": 9.02,
+            "cv_pct": 6.72
+          },
+          "mib_per_s_at_p50": 466.6,
+          "ns_per_byte_at_p50": 2.0439
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 156.348,
+            "p50": 158.252,
+            "p90": 160.254,
+            "p99": 181.934,
+            "max": 279.004,
+            "mean": 159.301,
+            "stddev": 6.663,
+            "cv_pct": 4.18
+          },
+          "mib_per_s_at_p50": 385.7,
+          "ns_per_byte_at_p50": 2.4727
+        },
+        "rust-cabi": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 139.453,
+            "p50": 139.795,
+            "p90": 144.922,
+            "p99": 168.75,
+            "max": 177.93,
+            "mean": 141.54,
+            "stddev": 4.908,
+            "cv_pct": 3.47
+          },
+          "mib_per_s_at_p50": 436.6,
+          "ns_per_byte_at_p50": 2.1843
+        },
+        "rust-native": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 137.842,
+            "p50": 137.988,
+            "p90": 147.559,
+            "p99": 202.441,
+            "max": 385.645,
+            "mean": 141.685,
+            "stddev": 15.195,
+            "cv_pct": 10.72
+          },
+          "mib_per_s_at_p50": 442.3,
+          "ns_per_byte_at_p50": 2.1561
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.936,
+        "rust-native_over_c-lto": 1.147,
+        "rust-native_over_c-shipped": 0.948
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.058,
+        "rust-native_over_c-lto": 0.899
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_32",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2396.875,
+            "p50": 2400,
+            "p90": 2630.469,
+            "p99": 2974.219,
+            "max": 4050,
+            "mean": 2454.611,
+            "stddev": 140.096,
+            "cv_pct": 5.71
+          },
+          "mib_per_s_at_p50": 406.9,
+          "ns_per_byte_at_p50": 2.3438
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2483.594,
+            "p50": 2504.688,
+            "p90": 2550,
+            "p99": 3185.938,
+            "max": 3717.188,
+            "mean": 2529.884,
+            "stddev": 115.76,
+            "cv_pct": 4.58
+          },
+          "mib_per_s_at_p50": 389.9,
+          "ns_per_byte_at_p50": 2.446
+        },
+        "rust-cabi": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2450,
+            "p50": 2452.344,
+            "p90": 2682.031,
+            "p99": 3461.719,
+            "max": 4896.875,
+            "mean": 2515.48,
+            "stddev": 217.915,
+            "cv_pct": 8.66
+          },
+          "mib_per_s_at_p50": 398.2,
+          "ns_per_byte_at_p50": 2.3949
+        },
+        "rust-native": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2437.5,
+            "p50": 2454.688,
+            "p90": 2678.125,
+            "p99": 3297.656,
+            "max": 5383.594,
+            "mean": 2533.267,
+            "stddev": 233.046,
+            "cv_pct": 9.2
+          },
+          "mib_per_s_at_p50": 397.8,
+          "ns_per_byte_at_p50": 2.3972
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.979,
+        "rust-native_over_c-lto": 1.02,
+        "rust-native_over_c-shipped": 0.978
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.859,
+        "rust-native_over_c-lto": 0.966
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_32",
+      "bytes": 1048576,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2480800,
+            "p50": 2579600,
+            "p90": 3604900,
+            "p99": 14352200,
+            "max": 35409800,
+            "mean": 3115297,
+            "stddev": 2799270.705,
+            "cv_pct": 89.86
+          },
+          "mib_per_s_at_p50": 387.7,
+          "ns_per_byte_at_p50": 2.4601
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2482800,
+            "p50": 2564700,
+            "p90": 2670600,
+            "p99": 3219600,
+            "max": 4255700,
+            "mean": 2602047,
+            "stddev": 167905.206,
+            "cv_pct": 6.45
+          },
+          "mib_per_s_at_p50": 389.9,
+          "ns_per_byte_at_p50": 2.4459
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2488300,
+            "p50": 2516700,
+            "p90": 2626700,
+            "p99": 3014800,
+            "max": 3037300,
+            "mean": 2548172.5,
+            "stddev": 96482.723,
+            "cv_pct": 3.79
+          },
+          "mib_per_s_at_p50": 397.3,
+          "ns_per_byte_at_p50": 2.4001
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2496500,
+            "p50": 2596900,
+            "p90": 2763300,
+            "p99": 4411400,
+            "max": 6713500,
+            "mean": 2682530,
+            "stddev": 403282.884,
+            "cv_pct": 15.03
+          },
+          "mib_per_s_at_p50": 385.1,
+          "ns_per_byte_at_p50": 2.4766
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.025,
+        "rust-native_over_c-lto": 0.988,
+        "rust-native_over_c-shipped": 0.993
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 4.761,
+        "rust-native_over_c-lto": 0.73
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_32",
+      "bytes": 104857600,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 250444200,
+            "p50": 255671100,
+            "p90": 281186100,
+            "p99": 323681500,
+            "max": 323681500,
+            "mean": 261382228,
+            "stddev": 16717289.035,
+            "cv_pct": 6.4
+          },
+          "mib_per_s_at_p50": 391.1,
+          "ns_per_byte_at_p50": 2.4383
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 255007200,
+            "p50": 304075800,
+            "p90": 388386400,
+            "p99": 455278300,
+            "max": 455278300,
+            "mean": 314823748,
+            "stddev": 50205085.875,
+            "cv_pct": 15.95
+          },
+          "mib_per_s_at_p50": 328.9,
+          "ns_per_byte_at_p50": 2.8999
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 255759200,
+            "p50": 265945000,
+            "p90": 298798400,
+            "p99": 320103000,
+            "max": 320103000,
+            "mean": 273048988,
+            "stddev": 16657522.584,
+            "cv_pct": 6.1
+          },
+          "mib_per_s_at_p50": 376,
+          "ns_per_byte_at_p50": 2.5362
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 251488400,
+            "p50": 260779000,
+            "p90": 267544500,
+            "p99": 270996300,
+            "max": 270996300,
+            "mean": 261056440,
+            "stddev": 5040155.284,
+            "cv_pct": 1.93
+          },
+          "mib_per_s_at_p50": 383.5,
+          "ns_per_byte_at_p50": 2.487
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.961,
+        "rust-native_over_c-lto": 1.166,
+        "rust-native_over_c-shipped": 0.98
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.011,
+        "rust-native_over_c-lto": 1.68
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_32",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 21.13,
+            "p50": 21.49,
+            "p90": 24.89,
+            "p99": 112.769,
+            "max": 169.122,
+            "mean": 25.554,
+            "stddev": 16.58,
+            "cv_pct": 64.88
+          },
+          "mib_per_s_at_p50": 710,
+          "ns_per_byte_at_p50": 1.3432
+        },
+        "c-lto": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 19.983,
+            "p50": 20.074,
+            "p90": 20.404,
+            "p99": 24.487,
+            "max": 26.147,
+            "mean": 20.305,
+            "stddev": 0.785,
+            "cv_pct": 3.87
+          },
+          "mib_per_s_at_p50": 760.1,
+          "ns_per_byte_at_p50": 1.2547
+        },
+        "rust-cabi": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 21.326,
+            "p50": 21.497,
+            "p90": 22.62,
+            "p99": 39.282,
+            "max": 444.897,
+            "mean": 23.134,
+            "stddev": 19.138,
+            "cv_pct": 82.73
+          },
+          "mib_per_s_at_p50": 709.8,
+          "ns_per_byte_at_p50": 1.3435
+        },
+        "rust-native": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 20.532,
+            "p50": 20.581,
+            "p90": 20.63,
+            "p99": 27.417,
+            "max": 39.233,
+            "mean": 20.796,
+            "stddev": 1.271,
+            "cv_pct": 6.11
+          },
+          "mib_per_s_at_p50": 741.4,
+          "ns_per_byte_at_p50": 1.2863
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1,
+        "rust-native_over_c-lto": 0.975,
+        "rust-native_over_c-shipped": 1.044
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 2.871,
+        "rust-native_over_c-lto": 0.893
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_32",
+      "bytes": 16777216,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 39845600,
+            "p50": 40383000,
+            "p90": 41242100,
+            "p99": 42014000,
+            "max": 42014000,
+            "mean": 40538101.667,
+            "stddev": 535492.653,
+            "cv_pct": 1.32
+          },
+          "mib_per_s_at_p50": 396.2,
+          "ns_per_byte_at_p50": 2.407
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 39716600,
+            "p50": 40135000,
+            "p90": 41526500,
+            "p99": 42799000,
+            "max": 42799000,
+            "mean": 40377706.667,
+            "stddev": 705777.067,
+            "cv_pct": 1.75
+          },
+          "mib_per_s_at_p50": 398.7,
+          "ns_per_byte_at_p50": 2.3922
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 40481600,
+            "p50": 41856800,
+            "p90": 48157200,
+            "p99": 103508300,
+            "max": 103508300,
+            "mean": 45166595,
+            "stddev": 10809883.967,
+            "cv_pct": 23.93
+          },
+          "mib_per_s_at_p50": 382.3,
+          "ns_per_byte_at_p50": 2.4949
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 40573600,
+            "p50": 41251000,
+            "p90": 42788900,
+            "p99": 46734800,
+            "max": 46734800,
+            "mean": 41571085,
+            "stddev": 1004945.755,
+            "cv_pct": 2.42
+          },
+          "mib_per_s_at_p50": 387.9,
+          "ns_per_byte_at_p50": 2.4588
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.965,
+        "rust-native_over_c-lto": 0.973,
+        "rust-native_over_c-shipped": 0.979
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.406,
+        "rust-native_over_c-lto": 0.916
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_32",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 583.398,
+            "p50": 584.18,
+            "p90": 642.383,
+            "p99": 716.992,
+            "max": 821.68,
+            "mean": 598.877,
+            "stddev": 30.464,
+            "cv_pct": 5.09
+          },
+          "mib_per_s_at_p50": 417.9,
+          "ns_per_byte_at_p50": 2.282
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 604.492,
+            "p50": 609.375,
+            "p90": 641.211,
+            "p99": 1118.75,
+            "max": 5356.25,
+            "mean": 639.392,
+            "stddev": 227.843,
+            "cv_pct": 35.63
+          },
+          "mib_per_s_at_p50": 400.6,
+          "ns_per_byte_at_p50": 2.3804
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 595.117,
+            "p50": 602.539,
+            "p90": 644.922,
+            "p99": 739.648,
+            "max": 1063.672,
+            "mean": 614.438,
+            "stddev": 36.031,
+            "cv_pct": 5.86
+          },
+          "mib_per_s_at_p50": 405.2,
+          "ns_per_byte_at_p50": 2.3537
+        },
+        "rust-native": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 591.992,
+            "p50": 593.75,
+            "p90": 664.063,
+            "p99": 714.063,
+            "max": 822.852,
+            "mean": 610.922,
+            "stddev": 34.952,
+            "cv_pct": 5.72
+          },
+          "mib_per_s_at_p50": 411.2,
+          "ns_per_byte_at_p50": 2.3193
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.97,
+        "rust-native_over_c-lto": 1.026,
+        "rust-native_over_c-shipped": 0.984
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.969,
+        "rust-native_over_c-lto": 1.567
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_32",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 128.076,
+            "p50": 128.32,
+            "p90": 136.328,
+            "p99": 171.582,
+            "max": 239.6,
+            "mean": 131.039,
+            "stddev": 9.443,
+            "cv_pct": 7.21
+          },
+          "mib_per_s_at_p50": 475.6,
+          "ns_per_byte_at_p50": 2.005
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 126.904,
+            "p50": 131.689,
+            "p90": 141.943,
+            "p99": 183.887,
+            "max": 329.883,
+            "mean": 134.623,
+            "stddev": 15.028,
+            "cv_pct": 11.16
+          },
+          "mib_per_s_at_p50": 463.5,
+          "ns_per_byte_at_p50": 2.0576
+        },
+        "rust-cabi": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 130.42,
+            "p50": 130.762,
+            "p90": 139.502,
+            "p99": 166.113,
+            "max": 245.02,
+            "mean": 133.644,
+            "stddev": 8.695,
+            "cv_pct": 6.51
+          },
+          "mib_per_s_at_p50": 466.8,
+          "ns_per_byte_at_p50": 2.0432
+        },
+        "rust-native": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 128.613,
+            "p50": 128.857,
+            "p90": 134.521,
+            "p99": 162.354,
+            "max": 247.363,
+            "mean": 131.386,
+            "stddev": 9.374,
+            "cv_pct": 7.14
+          },
+          "mib_per_s_at_p50": 473.7,
+          "ns_per_byte_at_p50": 2.0134
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.981,
+        "rust-native_over_c-lto": 1.022,
+        "rust-native_over_c-shipped": 0.996
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.033,
+        "rust-native_over_c-lto": 1.133
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_64_ecma",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2474.219,
+            "p50": 2476.563,
+            "p90": 2701.563,
+            "p99": 2967.969,
+            "max": 3147.656,
+            "mean": 2513.128,
+            "stddev": 94.779,
+            "cv_pct": 3.77
+          },
+          "mib_per_s_at_p50": 394.3,
+          "ns_per_byte_at_p50": 2.4185
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2474.219,
+            "p50": 2559.375,
+            "p90": 2699.219,
+            "p99": 3074.219,
+            "max": 8413.281,
+            "mean": 2592.533,
+            "stddev": 325.506,
+            "cv_pct": 12.56
+          },
+          "mib_per_s_at_p50": 381.6,
+          "ns_per_byte_at_p50": 2.4994
+        },
+        "rust-cabi": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2394.531,
+            "p50": 2410.156,
+            "p90": 2639.844,
+            "p99": 3480.469,
+            "max": 3994.531,
+            "mean": 2481.863,
+            "stddev": 190.766,
+            "cv_pct": 7.69
+          },
+          "mib_per_s_at_p50": 405.2,
+          "ns_per_byte_at_p50": 2.3537
+        },
+        "rust-native": {
+          "batch_calls": 64,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2407.813,
+            "p50": 2484.375,
+            "p90": 2553.125,
+            "p99": 2973.438,
+            "max": 3090.625,
+            "mean": 2511.247,
+            "stddev": 110.325,
+            "cv_pct": 4.39
+          },
+          "mib_per_s_at_p50": 393.1,
+          "ns_per_byte_at_p50": 2.4261
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.028,
+        "rust-native_over_c-lto": 1.03,
+        "rust-native_over_c-shipped": 0.997
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.853,
+        "rust-native_over_c-lto": 1.034
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_64_ecma",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 21.704,
+            "p50": 22.168,
+            "p90": 23.639,
+            "p99": 32.8,
+            "max": 236.774,
+            "mean": 23.375,
+            "stddev": 10.481,
+            "cv_pct": 44.84
+          },
+          "mib_per_s_at_p50": 688.3,
+          "ns_per_byte_at_p50": 1.3855
+        },
+        "c-lto": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 20.02,
+            "p50": 20.697,
+            "p90": 22.26,
+            "p99": 31.067,
+            "max": 52.161,
+            "mean": 21.109,
+            "stddev": 2.322,
+            "cv_pct": 11
+          },
+          "mib_per_s_at_p50": 737.2,
+          "ns_per_byte_at_p50": 1.2936
+        },
+        "rust-cabi": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 20.02,
+            "p50": 20.331,
+            "p90": 21.954,
+            "p99": 60.083,
+            "max": 240.131,
+            "mean": 22.305,
+            "stddev": 14.935,
+            "cv_pct": 66.96
+          },
+          "mib_per_s_at_p50": 750.5,
+          "ns_per_byte_at_p50": 1.2707
+        },
+        "rust-native": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 19.659,
+            "p50": 19.69,
+            "p90": 20.728,
+            "p99": 29.547,
+            "max": 40.308,
+            "mean": 20.198,
+            "stddev": 1.723,
+            "cv_pct": 8.53
+          },
+          "mib_per_s_at_p50": 775,
+          "ns_per_byte_at_p50": 1.2306
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.09,
+        "rust-native_over_c-lto": 1.051,
+        "rust-native_over_c-shipped": 1.126
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.546,
+        "rust-native_over_c-lto": 1.051
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_64_ecma",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 600.781,
+            "p50": 601.563,
+            "p90": 633.789,
+            "p99": 722.852,
+            "max": 760.938,
+            "mean": 609.723,
+            "stddev": 23.009,
+            "cv_pct": 3.77
+          },
+          "mib_per_s_at_p50": 405.8,
+          "ns_per_byte_at_p50": 2.3499
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 617.773,
+            "p50": 624.805,
+            "p90": 640.43,
+            "p99": 1129.492,
+            "max": 7214.063,
+            "mean": 663.308,
+            "stddev": 316.876,
+            "cv_pct": 47.77
+          },
+          "mib_per_s_at_p50": 390.7,
+          "ns_per_byte_at_p50": 2.4406
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 582.813,
+            "p50": 588.281,
+            "p90": 644.141,
+            "p99": 785.547,
+            "max": 1051.172,
+            "mean": 604.938,
+            "stddev": 41.545,
+            "cv_pct": 6.87
+          },
+          "mib_per_s_at_p50": 415,
+          "ns_per_byte_at_p50": 2.298
+        },
+        "rust-native": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 585.156,
+            "p50": 607.031,
+            "p90": 654.883,
+            "p99": 751.953,
+            "max": 933.398,
+            "mean": 618.659,
+            "stddev": 34.778,
+            "cv_pct": 5.62
+          },
+          "mib_per_s_at_p50": 402.2,
+          "ns_per_byte_at_p50": 2.3712
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.023,
+        "rust-native_over_c-lto": 1.029,
+        "rust-native_over_c-shipped": 0.991
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.92,
+        "rust-native_over_c-lto": 1.502
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_64_ecma",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 132.08,
+            "p50": 132.568,
+            "p90": 133.887,
+            "p99": 161.865,
+            "max": 164.648,
+            "mean": 133.775,
+            "stddev": 4.419,
+            "cv_pct": 3.3
+          },
+          "mib_per_s_at_p50": 460.4,
+          "ns_per_byte_at_p50": 2.0714
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 128.076,
+            "p50": 133.545,
+            "p90": 143.213,
+            "p99": 250.342,
+            "max": 796.045,
+            "mean": 138.754,
+            "stddev": 36.097,
+            "cv_pct": 26.02
+          },
+          "mib_per_s_at_p50": 457,
+          "ns_per_byte_at_p50": 2.0866
+        },
+        "rust-cabi": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 126.074,
+            "p50": 127.393,
+            "p90": 140.82,
+            "p99": 179.443,
+            "max": 278.809,
+            "mean": 131.231,
+            "stddev": 10.818,
+            "cv_pct": 8.24
+          },
+          "mib_per_s_at_p50": 479.1,
+          "ns_per_byte_at_p50": 1.9905
+        },
+        "rust-native": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 125,
+            "p50": 125.879,
+            "p90": 140.43,
+            "p99": 174.707,
+            "max": 206.592,
+            "mean": 130.163,
+            "stddev": 10.05,
+            "cv_pct": 7.72
+          },
+          "mib_per_s_at_p50": 484.9,
+          "ns_per_byte_at_p50": 1.9669
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.041,
+        "rust-native_over_c-lto": 1.061,
+        "rust-native_over_c-shipped": 1.053
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.902,
+        "rust-native_over_c-lto": 1.433
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_64_we",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2473.438,
+            "p50": 2476.563,
+            "p90": 2706.25,
+            "p99": 3050,
+            "max": 3963.281,
+            "mean": 2528.078,
+            "stddev": 142.636,
+            "cv_pct": 5.64
+          },
+          "mib_per_s_at_p50": 394.3,
+          "ns_per_byte_at_p50": 2.4185
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2474.219,
+            "p50": 2559.375,
+            "p90": 2609.375,
+            "p99": 3013.281,
+            "max": 7506.25,
+            "mean": 2580.647,
+            "stddev": 254.716,
+            "cv_pct": 9.87
+          },
+          "mib_per_s_at_p50": 381.6,
+          "ns_per_byte_at_p50": 2.4994
+        },
+        "rust-cabi": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2406.25,
+            "p50": 2410.938,
+            "p90": 2427.344,
+            "p99": 2989.844,
+            "max": 3702.344,
+            "mean": 2441.172,
+            "stddev": 123.651,
+            "cv_pct": 5.07
+          },
+          "mib_per_s_at_p50": 405.1,
+          "ns_per_byte_at_p50": 2.3544
+        },
+        "rust-native": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2397.656,
+            "p50": 2401.563,
+            "p90": 2634.375,
+            "p99": 3180.469,
+            "max": 3778.906,
+            "mean": 2478.225,
+            "stddev": 156.304,
+            "cv_pct": 6.31
+          },
+          "mib_per_s_at_p50": 406.6,
+          "ns_per_byte_at_p50": 2.3453
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.027,
+        "rust-native_over_c-lto": 1.066,
+        "rust-native_over_c-shipped": 1.031
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.02,
+        "rust-native_over_c-lto": 0.947
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_64_we",
+      "bytes": 1048576,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2562700,
+            "p50": 2651100,
+            "p90": 2812400,
+            "p99": 4248900,
+            "max": 5278700,
+            "mean": 2711068,
+            "stddev": 285919.655,
+            "cv_pct": 10.55
+          },
+          "mib_per_s_at_p50": 377.2,
+          "ns_per_byte_at_p50": 2.5283
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2563700,
+            "p50": 2651200,
+            "p90": 2752400,
+            "p99": 3216300,
+            "max": 3406800,
+            "mean": 2682000.5,
+            "stddev": 116811.292,
+            "cv_pct": 4.36
+          },
+          "mib_per_s_at_p50": 377.2,
+          "ns_per_byte_at_p50": 2.5284
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2473800,
+            "p50": 2491100,
+            "p90": 2632500,
+            "p99": 2935900,
+            "max": 3231800,
+            "mean": 2540089,
+            "stddev": 103170.025,
+            "cv_pct": 4.06
+          },
+          "mib_per_s_at_p50": 401.4,
+          "ns_per_byte_at_p50": 2.3757
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2549100,
+            "p50": 2583600,
+            "p90": 3233500,
+            "p99": 17795000,
+            "max": 51646600,
+            "mean": 3228009.5,
+            "stddev": 4134246.03,
+            "cv_pct": 128.07
+          },
+          "mib_per_s_at_p50": 387.1,
+          "ns_per_byte_at_p50": 2.4639
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.064,
+        "rust-native_over_c-lto": 1.026,
+        "rust-native_over_c-shipped": 1.026
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.447,
+        "rust-native_over_c-lto": 0.181
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_64_we",
+      "bytes": 104857600,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 261236700,
+            "p50": 288701700,
+            "p90": 332936700,
+            "p99": 376043700,
+            "max": 376043700,
+            "mean": 297459808,
+            "stddev": 31455000.793,
+            "cv_pct": 10.57
+          },
+          "mib_per_s_at_p50": 346.4,
+          "ns_per_byte_at_p50": 2.7533
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 274072400,
+            "p50": 294189800,
+            "p90": 336844900,
+            "p99": 360172700,
+            "max": 360172700,
+            "mean": 301565368,
+            "stddev": 24199945.613,
+            "cv_pct": 8.02
+          },
+          "mib_per_s_at_p50": 339.9,
+          "ns_per_byte_at_p50": 2.8056
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 253586200,
+            "p50": 262012800,
+            "p90": 284905400,
+            "p99": 298935700,
+            "max": 298935700,
+            "mean": 265557812,
+            "stddev": 11233907.45,
+            "cv_pct": 4.23
+          },
+          "mib_per_s_at_p50": 381.7,
+          "ns_per_byte_at_p50": 2.4987
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 253137100,
+            "p50": 265594600,
+            "p90": 273898600,
+            "p99": 332501100,
+            "max": 332501100,
+            "mean": 267457864,
+            "stddev": 15318350.656,
+            "cv_pct": 5.73
+          },
+          "mib_per_s_at_p50": 376.5,
+          "ns_per_byte_at_p50": 2.5329
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.102,
+        "rust-native_over_c-lto": 1.108,
+        "rust-native_over_c-shipped": 1.087
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.258,
+        "rust-native_over_c-lto": 1.083
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_64_we",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.247,
+            "p50": 22.827,
+            "p90": 26.227,
+            "p99": 113.098,
+            "max": 2856.952,
+            "mean": 35.091,
+            "stddev": 145.114,
+            "cv_pct": 413.54
+          },
+          "mib_per_s_at_p50": 668.4,
+          "ns_per_byte_at_p50": 1.4267
+        },
+        "c-lto": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 20.398,
+            "p50": 21.545,
+            "p90": 25.269,
+            "p99": 87.256,
+            "max": 614.258,
+            "mean": 25.793,
+            "stddev": 29.682,
+            "cv_pct": 115.08
+          },
+          "mib_per_s_at_p50": 708.2,
+          "ns_per_byte_at_p50": 1.3466
+        },
+        "rust-cabi": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 20.532,
+            "p50": 20.728,
+            "p90": 21.735,
+            "p99": 45.984,
+            "max": 324.213,
+            "mean": 22.351,
+            "stddev": 14.395,
+            "cv_pct": 64.4
+          },
+          "mib_per_s_at_p50": 736.2,
+          "ns_per_byte_at_p50": 1.2955
+        },
+        "rust-native": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 19.885,
+            "p50": 20.544,
+            "p90": 21.844,
+            "p99": 28.436,
+            "max": 36.963,
+            "mean": 20.878,
+            "stddev": 1.639,
+            "cv_pct": 7.85
+          },
+          "mib_per_s_at_p50": 742.7,
+          "ns_per_byte_at_p50": 1.284
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.101,
+        "rust-native_over_c-lto": 1.049,
+        "rust-native_over_c-shipped": 1.111
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 2.46,
+        "rust-native_over_c-lto": 3.069
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_64_we",
+      "bytes": 16777216,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 41406900,
+            "p50": 42755100,
+            "p90": 46067100,
+            "p99": 108732100,
+            "max": 108732100,
+            "mean": 44785453.333,
+            "stddev": 9060642.123,
+            "cv_pct": 20.23
+          },
+          "mib_per_s_at_p50": 374.2,
+          "ns_per_byte_at_p50": 2.5484
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 41046800,
+            "p50": 41750900,
+            "p90": 42500300,
+            "p99": 49475200,
+            "max": 49475200,
+            "mean": 41948778.333,
+            "stddev": 1106128.823,
+            "cv_pct": 2.64
+          },
+          "mib_per_s_at_p50": 383.2,
+          "ns_per_byte_at_p50": 2.4885
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 39705900,
+            "p50": 42246500,
+            "p90": 49706400,
+            "p99": 73816600,
+            "max": 73816600,
+            "mean": 44223865,
+            "stddev": 5695835.406,
+            "cv_pct": 12.88
+          },
+          "mib_per_s_at_p50": 378.7,
+          "ns_per_byte_at_p50": 2.5181
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 39925800,
+            "p50": 40605500,
+            "p90": 41406100,
+            "p99": 43133400,
+            "max": 43133400,
+            "mean": 40666140,
+            "stddev": 657495.374,
+            "cv_pct": 1.62
+          },
+          "mib_per_s_at_p50": 394,
+          "ns_per_byte_at_p50": 2.4203
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.012,
+        "rust-native_over_c-lto": 1.028,
+        "rust-native_over_c-shipped": 1.053
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.473,
+        "rust-native_over_c-lto": 1.147
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_64_we",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 600.391,
+            "p50": 601.367,
+            "p90": 605.859,
+            "p99": 761.914,
+            "max": 971.289,
+            "mean": 610.018,
+            "stddev": 36.703,
+            "cv_pct": 6.02
+          },
+          "mib_per_s_at_p50": 406,
+          "ns_per_byte_at_p50": 2.3491
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 619.141,
+            "p50": 625.977,
+            "p90": 640.82,
+            "p99": 1177.148,
+            "max": 4403.906,
+            "mean": 649.948,
+            "stddev": 197.971,
+            "cv_pct": 30.46
+          },
+          "mib_per_s_at_p50": 390,
+          "ns_per_byte_at_p50": 2.4452
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 585.742,
+            "p50": 605.469,
+            "p90": 616.016,
+            "p99": 865.82,
+            "max": 5108.984,
+            "mean": 623.917,
+            "stddev": 206.415,
+            "cv_pct": 33.08
+          },
+          "mib_per_s_at_p50": 403.2,
+          "ns_per_byte_at_p50": 2.3651
+        },
+        "rust-native": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 583.984,
+            "p50": 604.688,
+            "p90": 617.383,
+            "p99": 681.25,
+            "max": 751.758,
+            "mean": 609.411,
+            "stddev": 16.577,
+            "cv_pct": 2.72
+          },
+          "mib_per_s_at_p50": 403.7,
+          "ns_per_byte_at_p50": 2.3621
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.993,
+        "rust-native_over_c-lto": 1.035,
+        "rust-native_over_c-shipped": 0.995
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.88,
+        "rust-native_over_c-lto": 1.728
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_64_we",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 130.029,
+            "p50": 130.273,
+            "p90": 133.301,
+            "p99": 159.766,
+            "max": 208.496,
+            "mean": 132.245,
+            "stddev": 6.59,
+            "cv_pct": 4.98
+          },
+          "mib_per_s_at_p50": 468.5,
+          "ns_per_byte_at_p50": 2.0355
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 129.346,
+            "p50": 134.277,
+            "p90": 144.873,
+            "p99": 214.648,
+            "max": 985.889,
+            "mean": 139.561,
+            "stddev": 44.842,
+            "cv_pct": 32.13
+          },
+          "mib_per_s_at_p50": 454.5,
+          "ns_per_byte_at_p50": 2.0981
+        },
+        "rust-cabi": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 126.563,
+            "p50": 126.904,
+            "p90": 128.369,
+            "p99": 156.445,
+            "max": 184.424,
+            "mean": 128.312,
+            "stddev": 4.961,
+            "cv_pct": 3.87
+          },
+          "mib_per_s_at_p50": 481,
+          "ns_per_byte_at_p50": 1.9829
+        },
+        "rust-native": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 125.732,
+            "p50": 131.201,
+            "p90": 142.09,
+            "p99": 191.406,
+            "max": 256.787,
+            "mean": 134.322,
+            "stddev": 11.903,
+            "cv_pct": 8.86
+          },
+          "mib_per_s_at_p50": 465.2,
+          "ns_per_byte_at_p50": 2.05
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.027,
+        "rust-native_over_c-lto": 1.023,
+        "rust-native_over_c-shipped": 0.993
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.021,
+        "rust-native_over_c-lto": 1.121
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_8",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2066.406,
+            "p50": 2068.75,
+            "p90": 2178.125,
+            "p99": 2542.969,
+            "max": 2788.281,
+            "mean": 2103.334,
+            "stddev": 97.959,
+            "cv_pct": 4.66
+          },
+          "mib_per_s_at_p50": 472.1,
+          "ns_per_byte_at_p50": 2.0203
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2128.125,
+            "p50": 2151.563,
+            "p90": 2292.969,
+            "p99": 9257.031,
+            "max": 36598.438,
+            "mean": 2403.48,
+            "stddev": 2039.208,
+            "cv_pct": 84.84
+          },
+          "mib_per_s_at_p50": 453.9,
+          "ns_per_byte_at_p50": 2.1011
+        },
+        "rust-cabi": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 1989.063,
+            "p50": 1991.406,
+            "p90": 2051.563,
+            "p99": 2377.344,
+            "max": 2660.156,
+            "mean": 2009.945,
+            "stddev": 67.626,
+            "cv_pct": 3.36
+          },
+          "mib_per_s_at_p50": 490.4,
+          "ns_per_byte_at_p50": 1.9447
+        },
+        "rust-native": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2063.281,
+            "p50": 2064.844,
+            "p90": 2195.313,
+            "p99": 3000,
+            "max": 4044.531,
+            "mean": 2115.175,
+            "stddev": 179.029,
+            "cv_pct": 8.46
+          },
+          "mib_per_s_at_p50": 472.9,
+          "ns_per_byte_at_p50": 2.0164
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.039,
+        "rust-native_over_c-lto": 1.042,
+        "rust-native_over_c-shipped": 1.002
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.07,
+        "rust-native_over_c-lto": 3.086
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_8",
+      "bytes": 1048576,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2168500,
+            "p50": 2204200,
+            "p90": 2294500,
+            "p99": 2644900,
+            "max": 2863000,
+            "mean": 2227629,
+            "stddev": 91139.241,
+            "cv_pct": 4.09
+          },
+          "mib_per_s_at_p50": 453.7,
+          "ns_per_byte_at_p50": 2.1021
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2233500,
+            "p50": 2243000,
+            "p90": 2324300,
+            "p99": 4062100,
+            "max": 4798400,
+            "mean": 2304068,
+            "stddev": 280700.897,
+            "cv_pct": 12.18
+          },
+          "mib_per_s_at_p50": 445.8,
+          "ns_per_byte_at_p50": 2.1391
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2086900,
+            "p50": 2088800,
+            "p90": 2178900,
+            "p99": 2375900,
+            "max": 2554300,
+            "mean": 2116846.5,
+            "stddev": 65477.987,
+            "cv_pct": 3.09
+          },
+          "mib_per_s_at_p50": 478.7,
+          "ns_per_byte_at_p50": 1.992
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2168600,
+            "p50": 2226400,
+            "p90": 2360700,
+            "p99": 2716300,
+            "max": 3030400,
+            "mean": 2261012.5,
+            "stddev": 124090.795,
+            "cv_pct": 5.49
+          },
+          "mib_per_s_at_p50": 449.2,
+          "ns_per_byte_at_p50": 2.1233
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.055,
+        "rust-native_over_c-lto": 1.007,
+        "rust-native_over_c-shipped": 0.99
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.113,
+        "rust-native_over_c-lto": 1.495
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_8",
+      "bytes": 104857600,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 219076600,
+            "p50": 223492400,
+            "p90": 260713300,
+            "p99": 299766300,
+            "max": 299766300,
+            "mean": 230392984,
+            "stddev": 19191895.408,
+            "cv_pct": 8.33
+          },
+          "mib_per_s_at_p50": 447.4,
+          "ns_per_byte_at_p50": 2.1314
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 219894300,
+            "p50": 224302200,
+            "p90": 248193500,
+            "p99": 275420400,
+            "max": 275420400,
+            "mean": 230322840,
+            "stddev": 13213516.752,
+            "cv_pct": 5.74
+          },
+          "mib_per_s_at_p50": 445.8,
+          "ns_per_byte_at_p50": 2.1391
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 212397800,
+            "p50": 222486500,
+            "p90": 297742900,
+            "p99": 306622800,
+            "max": 306622800,
+            "mean": 233847724,
+            "stddev": 27245436.429,
+            "cv_pct": 11.65
+          },
+          "mib_per_s_at_p50": 449.5,
+          "ns_per_byte_at_p50": 2.1218
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 219858600,
+            "p50": 227153600,
+            "p90": 306898900,
+            "p99": 327981300,
+            "max": 327981300,
+            "mean": 242654528,
+            "stddev": 31760492.043,
+            "cv_pct": 13.09
+          },
+          "mib_per_s_at_p50": 440.2,
+          "ns_per_byte_at_p50": 2.1663
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.005,
+        "rust-native_over_c-lto": 0.987,
+        "rust-native_over_c-shipped": 0.984
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.978,
+        "rust-native_over_c-lto": 0.84
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_8",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 15.552,
+            "p50": 15.656,
+            "p90": 17.389,
+            "p99": 23.193,
+            "max": 30.054,
+            "mean": 16.112,
+            "stddev": 1.565,
+            "cv_pct": 9.71
+          },
+          "mib_per_s_at_p50": 974.7,
+          "ns_per_byte_at_p50": 0.9785
+        },
+        "c-lto": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 15.063,
+            "p50": 15.161,
+            "p90": 16.156,
+            "p99": 20.795,
+            "max": 54.175,
+            "mean": 15.598,
+            "stddev": 1.979,
+            "cv_pct": 12.69
+          },
+          "mib_per_s_at_p50": 1006.4,
+          "ns_per_byte_at_p50": 0.9476
+        },
+        "rust-cabi": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 13.422,
+            "p50": 13.586,
+            "p90": 16.87,
+            "p99": 96.844,
+            "max": 176.66,
+            "mean": 16.566,
+            "stddev": 14.386,
+            "cv_pct": 86.84
+          },
+          "mib_per_s_at_p50": 1123.1,
+          "ns_per_byte_at_p50": 0.8492
+        },
+        "rust-native": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 13.77,
+            "p50": 14.423,
+            "p90": 14.6,
+            "p99": 19.995,
+            "max": 38.214,
+            "mean": 14.629,
+            "stddev": 1.453,
+            "cv_pct": 9.93
+          },
+          "mib_per_s_at_p50": 1058,
+          "ns_per_byte_at_p50": 0.9014
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.152,
+        "rust-native_over_c-lto": 1.051,
+        "rust-native_over_c-shipped": 1.085
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.239,
+        "rust-native_over_c-lto": 1.04
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_8",
+      "bytes": 16777216,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 34735900,
+            "p50": 35170700,
+            "p90": 36098800,
+            "p99": 39622000,
+            "max": 39622000,
+            "mean": 35370703.333,
+            "stddev": 731224.354,
+            "cv_pct": 2.07
+          },
+          "mib_per_s_at_p50": 454.9,
+          "ns_per_byte_at_p50": 2.0963
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 35053300,
+            "p50": 37454400,
+            "p90": 44889000,
+            "p99": 64728800,
+            "max": 64728800,
+            "mean": 39202508.333,
+            "stddev": 5207106.072,
+            "cv_pct": 13.28
+          },
+          "mib_per_s_at_p50": 427.2,
+          "ns_per_byte_at_p50": 2.2325
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 33691900,
+            "p50": 34219100,
+            "p90": 35919800,
+            "p99": 76038600,
+            "max": 76038600,
+            "mean": 35653661.667,
+            "stddev": 6526822.181,
+            "cv_pct": 18.31
+          },
+          "mib_per_s_at_p50": 467.6,
+          "ns_per_byte_at_p50": 2.0396
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 34730000,
+            "p50": 35074900,
+            "p90": 35953800,
+            "p99": 37965500,
+            "max": 37965500,
+            "mean": 35304791.667,
+            "stddev": 574547.762,
+            "cv_pct": 1.63
+          },
+          "mib_per_s_at_p50": 456.2,
+          "ns_per_byte_at_p50": 2.0906
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.028,
+        "rust-native_over_c-lto": 1.068,
+        "rust-native_over_c-shipped": 1.003
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.521,
+        "rust-native_over_c-lto": 1.705
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_8",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 482.031,
+            "p50": 482.422,
+            "p90": 507.617,
+            "p99": 617.383,
+            "max": 1000.586,
+            "mean": 491.706,
+            "stddev": 34.481,
+            "cv_pct": 7.01
+          },
+          "mib_per_s_at_p50": 506.1,
+          "ns_per_byte_at_p50": 1.8845
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 481.445,
+            "p50": 498.047,
+            "p90": 508.789,
+            "p99": 545.508,
+            "max": 734.961,
+            "mean": 500.491,
+            "stddev": 17.573,
+            "cv_pct": 3.51
+          },
+          "mib_per_s_at_p50": 490.2,
+          "ns_per_byte_at_p50": 1.9455
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 475.391,
+            "p50": 478.906,
+            "p90": 513.086,
+            "p99": 962.109,
+            "max": 4327.539,
+            "mean": 508.939,
+            "stddev": 191.773,
+            "cv_pct": 37.68
+          },
+          "mib_per_s_at_p50": 509.8,
+          "ns_per_byte_at_p50": 1.8707
+        },
+        "rust-native": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 478.516,
+            "p50": 478.906,
+            "p90": 506.641,
+            "p99": 664.063,
+            "max": 794.336,
+            "mean": 492.023,
+            "stddev": 34.565,
+            "cv_pct": 7.03
+          },
+          "mib_per_s_at_p50": 509.8,
+          "ns_per_byte_at_p50": 1.8707
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.007,
+        "rust-native_over_c-lto": 1.04,
+        "rust-native_over_c-shipped": 1.007
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.642,
+        "rust-native_over_c-lto": 0.821
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_8",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 4096,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 83.398,
+            "p50": 84.424,
+            "p90": 91.333,
+            "p99": 110.84,
+            "max": 140.527,
+            "mean": 86.618,
+            "stddev": 5.878,
+            "cv_pct": 6.79
+          },
+          "mib_per_s_at_p50": 723,
+          "ns_per_byte_at_p50": 1.3191
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 84.766,
+            "p50": 86.523,
+            "p90": 90.283,
+            "p99": 134.18,
+            "max": 1412.793,
+            "mean": 92.071,
+            "stddev": 62.738,
+            "cv_pct": 68.14
+          },
+          "mib_per_s_at_p50": 705.4,
+          "ns_per_byte_at_p50": 1.3519
+        },
+        "rust-cabi": {
+          "batch_calls": 4096,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 76.27,
+            "p50": 78.613,
+            "p90": 83.789,
+            "p99": 106.201,
+            "max": 209.668,
+            "mean": 80.077,
+            "stddev": 8.775,
+            "cv_pct": 10.96
+          },
+          "mib_per_s_at_p50": 776.4,
+          "ns_per_byte_at_p50": 1.2283
+        },
+        "rust-native": {
+          "batch_calls": 4096,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 82.739,
+            "p50": 85.571,
+            "p90": 90.259,
+            "p99": 108.96,
+            "max": 135.815,
+            "mean": 86.519,
+            "stddev": 4.956,
+            "cv_pct": 5.73
+          },
+          "mib_per_s_at_p50": 713.3,
+          "ns_per_byte_at_p50": 1.3371
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.074,
+        "rust-native_over_c-lto": 1.011,
+        "rust-native_over_c-shipped": 0.987
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.044,
+        "rust-native_over_c-lto": 1.231
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_ccitt_1d0f",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2691.406,
+            "p50": 2708.594,
+            "p90": 2958.594,
+            "p99": 4078.125,
+            "max": 37471.875,
+            "mean": 2883.447,
+            "stddev": 1598.12,
+            "cv_pct": 55.42
+          },
+          "mib_per_s_at_p50": 360.5,
+          "ns_per_byte_at_p50": 2.6451
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2768.75,
+            "p50": 2788.281,
+            "p90": 2842.969,
+            "p99": 4793.75,
+            "max": 25818.75,
+            "mean": 2921.433,
+            "stddev": 1233.84,
+            "cv_pct": 42.23
+          },
+          "mib_per_s_at_p50": 350.2,
+          "ns_per_byte_at_p50": 2.7229
+        },
+        "rust-cabi": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2695.313,
+            "p50": 2696.875,
+            "p90": 2903.125,
+            "p99": 3362.5,
+            "max": 4030.469,
+            "mean": 2735.597,
+            "stddev": 132.644,
+            "cv_pct": 4.85
+          },
+          "mib_per_s_at_p50": 362.1,
+          "ns_per_byte_at_p50": 2.6337
+        },
+        "rust-native": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2694.531,
+            "p50": 2790.625,
+            "p90": 3121.094,
+            "p99": 4745.313,
+            "max": 6360.156,
+            "mean": 2890.747,
+            "stddev": 379.285,
+            "cv_pct": 13.12
+          },
+          "mib_per_s_at_p50": 349.9,
+          "ns_per_byte_at_p50": 2.7252
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.004,
+        "rust-native_over_c-lto": 0.999,
+        "rust-native_over_c-shipped": 0.971
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.213,
+        "rust-native_over_c-lto": 1.01
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_ccitt_1d0f",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 4096,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 25.488,
+            "p50": 25.659,
+            "p90": 26.245,
+            "p99": 44.165,
+            "max": 509.961,
+            "mean": 27.75,
+            "stddev": 23.367,
+            "cv_pct": 84.21
+          },
+          "mib_per_s_at_p50": 594.7,
+          "ns_per_byte_at_p50": 1.6037
+        },
+        "c-lto": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.656,
+            "p50": 23.132,
+            "p90": 25.494,
+            "p99": 67.456,
+            "max": 153.931,
+            "mean": 24.961,
+            "stddev": 9.93,
+            "cv_pct": 39.78
+          },
+          "mib_per_s_at_p50": 659.6,
+          "ns_per_byte_at_p50": 1.4458
+        },
+        "rust-cabi": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 24.829,
+            "p50": 25.623,
+            "p90": 27.002,
+            "p99": 29.553,
+            "max": 37.012,
+            "mean": 25.78,
+            "stddev": 1.235,
+            "cv_pct": 4.79
+          },
+          "mib_per_s_at_p50": 595.5,
+          "ns_per_byte_at_p50": 1.6014
+        },
+        "rust-native": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.852,
+            "p50": 23.706,
+            "p90": 24.561,
+            "p99": 31.506,
+            "max": 68.542,
+            "mean": 24.197,
+            "stddev": 2.475,
+            "cv_pct": 10.23
+          },
+          "mib_per_s_at_p50": 643.7,
+          "ns_per_byte_at_p50": 1.4816
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.001,
+        "rust-native_over_c-lto": 0.976,
+        "rust-native_over_c-shipped": 1.082
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.494,
+        "rust-native_over_c-lto": 2.141
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_ccitt_1d0f",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 653.711,
+            "p50": 654.297,
+            "p90": 712.109,
+            "p99": 794.336,
+            "max": 893.75,
+            "mean": 668.343,
+            "stddev": 32.989,
+            "cv_pct": 4.94
+          },
+          "mib_per_s_at_p50": 373.1,
+          "ns_per_byte_at_p50": 2.5558
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 651.758,
+            "p50": 674.414,
+            "p90": 703.711,
+            "p99": 837.891,
+            "max": 1267.578,
+            "mean": 678.127,
+            "stddev": 38.055,
+            "cv_pct": 5.61
+          },
+          "mib_per_s_at_p50": 362,
+          "ns_per_byte_at_p50": 2.6344
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 657.422,
+            "p50": 673.242,
+            "p90": 693.555,
+            "p99": 848.438,
+            "max": 10249.219,
+            "mean": 696.95,
+            "stddev": 429.791,
+            "cv_pct": 61.67
+          },
+          "mib_per_s_at_p50": 362.6,
+          "ns_per_byte_at_p50": 2.6299
+        },
+        "rust-native": {
+          "batch_calls": 256,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 657.031,
+            "p50": 678.906,
+            "p90": 689.844,
+            "p99": 767.578,
+            "max": 1148.438,
+            "mean": 684.127,
+            "stddev": 32.225,
+            "cv_pct": 4.71
+          },
+          "mib_per_s_at_p50": 359.6,
+          "ns_per_byte_at_p50": 2.652
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.972,
+        "rust-native_over_c-lto": 0.993,
+        "rust-native_over_c-shipped": 0.964
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.936,
+        "rust-native_over_c-lto": 1.092
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_ccitt_1d0f",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 142.188,
+            "p50": 142.627,
+            "p90": 157.178,
+            "p99": 188.916,
+            "max": 272.607,
+            "mean": 146.666,
+            "stddev": 11.167,
+            "cv_pct": 7.61
+          },
+          "mib_per_s_at_p50": 427.9,
+          "ns_per_byte_at_p50": 2.2285
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 140.283,
+            "p50": 145.996,
+            "p90": 149.707,
+            "p99": 196.533,
+            "max": 707.324,
+            "mean": 149.229,
+            "stddev": 28.236,
+            "cv_pct": 18.92
+          },
+          "mib_per_s_at_p50": 418.1,
+          "ns_per_byte_at_p50": 2.2812
+        },
+        "rust-cabi": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 145.947,
+            "p50": 146.729,
+            "p90": 161.816,
+            "p99": 212.744,
+            "max": 518.018,
+            "mean": 152.807,
+            "stddev": 20.217,
+            "cv_pct": 13.23
+          },
+          "mib_per_s_at_p50": 416,
+          "ns_per_byte_at_p50": 2.2926
+        },
+        "rust-native": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 143.896,
+            "p50": 148.34,
+            "p90": 151.27,
+            "p99": 179.98,
+            "max": 231.934,
+            "mean": 148.592,
+            "stddev": 7.082,
+            "cv_pct": 4.77
+          },
+          "mib_per_s_at_p50": 411.5,
+          "ns_per_byte_at_p50": 2.3178
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.972,
+        "rust-native_over_c-lto": 0.984,
+        "rust-native_over_c-shipped": 0.961
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.888,
+        "rust-native_over_c-lto": 1.092
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_ccitt_ffff",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2691.406,
+            "p50": 2707.031,
+            "p90": 2932.031,
+            "p99": 3751.563,
+            "max": 6997.656,
+            "mean": 2776.944,
+            "stddev": 264.546,
+            "cv_pct": 9.53
+          },
+          "mib_per_s_at_p50": 360.8,
+          "ns_per_byte_at_p50": 2.6436
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2687.5,
+            "p50": 2787.5,
+            "p90": 2932.031,
+            "p99": 4427.344,
+            "max": 10285.156,
+            "mean": 2862.766,
+            "stddev": 446.514,
+            "cv_pct": 15.6
+          },
+          "mib_per_s_at_p50": 350.3,
+          "ns_per_byte_at_p50": 2.7222
+        },
+        "rust-cabi": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2695.313,
+            "p50": 2696.875,
+            "p90": 2700,
+            "p99": 3066.406,
+            "max": 3228.125,
+            "mean": 2706.595,
+            "stddev": 58.55,
+            "cv_pct": 2.16
+          },
+          "mib_per_s_at_p50": 362.1,
+          "ns_per_byte_at_p50": 2.6337
+        },
+        "rust-native": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2695.313,
+            "p50": 2798.438,
+            "p90": 3285.156,
+            "p99": 9372.656,
+            "max": 23305.469,
+            "mean": 3108.713,
+            "stddev": 1345.469,
+            "cv_pct": 43.28
+          },
+          "mib_per_s_at_p50": 349,
+          "ns_per_byte_at_p50": 2.7328
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.004,
+        "rust-native_over_c-lto": 0.996,
+        "rust-native_over_c-shipped": 0.967
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.223,
+        "rust-native_over_c-lto": 0.472
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_ccitt_ffff",
+      "bytes": 1048576,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2783500,
+            "p50": 2829600,
+            "p90": 2952600,
+            "p99": 3156200,
+            "max": 3466300,
+            "mean": 2858308,
+            "stddev": 95583.537,
+            "cv_pct": 3.34
+          },
+          "mib_per_s_at_p50": 353.4,
+          "ns_per_byte_at_p50": 2.6985
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2478600,
+            "p50": 2565700,
+            "p90": 2656000,
+            "p99": 2936100,
+            "max": 5985500,
+            "mean": 2594108.5,
+            "stddev": 252409.673,
+            "cv_pct": 9.73
+          },
+          "mib_per_s_at_p50": 389.8,
+          "ns_per_byte_at_p50": 2.4468
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2787600,
+            "p50": 2827700,
+            "p90": 2953500,
+            "p99": 3217200,
+            "max": 3437400,
+            "mean": 2856799,
+            "stddev": 94208.654,
+            "cv_pct": 3.3
+          },
+          "mib_per_s_at_p50": 353.6,
+          "ns_per_byte_at_p50": 2.6967
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 2782900,
+            "p50": 2873100,
+            "p90": 3058500,
+            "p99": 4954300,
+            "max": 5849500,
+            "mean": 2924949.5,
+            "stddev": 326390.271,
+            "cv_pct": 11.16
+          },
+          "mib_per_s_at_p50": 348.1,
+          "ns_per_byte_at_p50": 2.74
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.001,
+        "rust-native_over_c-lto": 0.893,
+        "rust-native_over_c-shipped": 0.985
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.981,
+        "rust-native_over_c-lto": 0.593
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_ccitt_ffff",
+      "bytes": 104857600,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 283037300,
+            "p50": 308015100,
+            "p90": 371276700,
+            "p99": 507054400,
+            "max": 507054400,
+            "mean": 326614364,
+            "stddev": 52161293.752,
+            "cv_pct": 15.97
+          },
+          "mib_per_s_at_p50": 324.7,
+          "ns_per_byte_at_p50": 2.9375
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 265329100,
+            "p50": 275756100,
+            "p90": 318774300,
+            "p99": 321667400,
+            "max": 321667400,
+            "mean": 286531240,
+            "stddev": 18934002.875,
+            "cv_pct": 6.61
+          },
+          "mib_per_s_at_p50": 362.6,
+          "ns_per_byte_at_p50": 2.6298
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 283080900,
+            "p50": 293575900,
+            "p90": 312979000,
+            "p99": 387088200,
+            "max": 387088200,
+            "mean": 298615364,
+            "stddev": 20613585.494,
+            "cv_pct": 6.9
+          },
+          "mib_per_s_at_p50": 340.6,
+          "ns_per_byte_at_p50": 2.7998
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 284681900,
+            "p50": 304738100,
+            "p90": 363518900,
+            "p99": 399952100,
+            "max": 399952100,
+            "mean": 316955896,
+            "stddev": 32279210.263,
+            "cv_pct": 10.18
+          },
+          "mib_per_s_at_p50": 328.2,
+          "ns_per_byte_at_p50": 2.9062
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.049,
+        "rust-native_over_c-lto": 0.905,
+        "rust-native_over_c-shipped": 1.011
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.31,
+        "rust-native_over_c-lto": 0.804
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_ccitt_ffff",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 24.744,
+            "p50": 24.866,
+            "p90": 26.221,
+            "p99": 32.214,
+            "max": 37.964,
+            "mean": 25.37,
+            "stddev": 1.421,
+            "cv_pct": 5.6
+          },
+          "mib_per_s_at_p50": 613.6,
+          "ns_per_byte_at_p50": 1.5541
+        },
+        "c-lto": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.705,
+            "p50": 23.138,
+            "p90": 26.19,
+            "p99": 79.053,
+            "max": 199.146,
+            "mean": 25.688,
+            "stddev": 13.035,
+            "cv_pct": 50.74
+          },
+          "mib_per_s_at_p50": 659.5,
+          "ns_per_byte_at_p50": 1.4462
+        },
+        "rust-cabi": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 24.829,
+            "p50": 25.635,
+            "p90": 27.124,
+            "p99": 34.167,
+            "max": 64.16,
+            "mean": 26.06,
+            "stddev": 2.515,
+            "cv_pct": 9.65
+          },
+          "mib_per_s_at_p50": 595.2,
+          "ns_per_byte_at_p50": 1.6022
+        },
+        "rust-native": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 23.56,
+            "p50": 23.737,
+            "p90": 24.774,
+            "p99": 35.492,
+            "max": 50.403,
+            "mean": 24.31,
+            "stddev": 2.36,
+            "cv_pct": 9.71
+          },
+          "mib_per_s_at_p50": 642.8,
+          "ns_per_byte_at_p50": 1.4835
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.97,
+        "rust-native_over_c-lto": 0.975,
+        "rust-native_over_c-shipped": 1.048
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.943,
+        "rust-native_over_c-lto": 2.227
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_ccitt_ffff",
+      "bytes": 16777216,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 44977000,
+            "p50": 45471000,
+            "p90": 46338700,
+            "p99": 51110900,
+            "max": 51110900,
+            "mean": 45738178.333,
+            "stddev": 895149.026,
+            "cv_pct": 1.96
+          },
+          "mib_per_s_at_p50": 351.9,
+          "ns_per_byte_at_p50": 2.7103
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 39849200,
+            "p50": 41098700,
+            "p90": 44686700,
+            "p99": 114307200,
+            "max": 114307200,
+            "mean": 43710213.333,
+            "stddev": 10483245.351,
+            "cv_pct": 23.98
+          },
+          "mib_per_s_at_p50": 389.3,
+          "ns_per_byte_at_p50": 2.4497
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 44768400,
+            "p50": 50113000,
+            "p90": 62094800,
+            "p99": 102176600,
+            "max": 102176600,
+            "mean": 53206143.333,
+            "stddev": 10183378.138,
+            "cv_pct": 19.14
+          },
+          "mib_per_s_at_p50": 319.3,
+          "ns_per_byte_at_p50": 2.987
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 44861000,
+            "p50": 45522900,
+            "p90": 48528800,
+            "p99": 61131300,
+            "max": 61131300,
+            "mean": 46482520,
+            "stddev": 2748425.007,
+            "cv_pct": 5.91
+          },
+          "mib_per_s_at_p50": 351.5,
+          "ns_per_byte_at_p50": 2.7134
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.907,
+        "rust-native_over_c-lto": 0.903,
+        "rust-native_over_c-shipped": 0.999
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.5,
+        "rust-native_over_c-lto": 1.87
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_ccitt_ffff",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 653.906,
+            "p50": 654.492,
+            "p90": 689.453,
+            "p99": 914.648,
+            "max": 1018.555,
+            "mean": 668.608,
+            "stddev": 45.385,
+            "cv_pct": 6.79
+          },
+          "mib_per_s_at_p50": 373,
+          "ns_per_byte_at_p50": 2.5566
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 651.953,
+            "p50": 674.219,
+            "p90": 683.594,
+            "p99": 841.211,
+            "max": 1446.484,
+            "mean": 680.115,
+            "stddev": 47.73,
+            "cv_pct": 7.02
+          },
+          "mib_per_s_at_p50": 362.1,
+          "ns_per_byte_at_p50": 2.6337
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 657.422,
+            "p50": 677.344,
+            "p90": 683.789,
+            "p99": 794.336,
+            "max": 990.625,
+            "mean": 673.96,
+            "stddev": 29.431,
+            "cv_pct": 4.37
+          },
+          "mib_per_s_at_p50": 360.4,
+          "ns_per_byte_at_p50": 2.6459
+        },
+        "rust-native": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 676.758,
+            "p50": 678.32,
+            "p90": 687.695,
+            "p99": 910.742,
+            "max": 1698.633,
+            "mean": 690.38,
+            "stddev": 61.671,
+            "cv_pct": 8.93
+          },
+          "mib_per_s_at_p50": 359.9,
+          "ns_per_byte_at_p50": 2.6497
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.966,
+        "rust-native_over_c-lto": 0.994,
+        "rust-native_over_c-shipped": 0.965
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.151,
+        "rust-native_over_c-lto": 0.924
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_ccitt_ffff",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 142.236,
+            "p50": 142.578,
+            "p90": 152.637,
+            "p99": 207.178,
+            "max": 293.359,
+            "mean": 147.038,
+            "stddev": 13.538,
+            "cv_pct": 9.21
+          },
+          "mib_per_s_at_p50": 428.1,
+          "ns_per_byte_at_p50": 2.2278
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 144.434,
+            "p50": 146.533,
+            "p90": 155.029,
+            "p99": 378.809,
+            "max": 7485.742,
+            "mean": 172.561,
+            "stddev": 339.94,
+            "cv_pct": 197
+          },
+          "mib_per_s_at_p50": 416.5,
+          "ns_per_byte_at_p50": 2.2896
+        },
+        "rust-cabi": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 147.852,
+            "p50": 153.076,
+            "p90": 163.379,
+            "p99": 263.184,
+            "max": 559.473,
+            "mean": 158.592,
+            "stddev": 30.491,
+            "cv_pct": 19.23
+          },
+          "mib_per_s_at_p50": 398.7,
+          "ns_per_byte_at_p50": 2.3918
+        },
+        "rust-native": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 143.896,
+            "p50": 144.043,
+            "p90": 158.301,
+            "p99": 201.66,
+            "max": 223.828,
+            "mean": 148.06,
+            "stddev": 10.504,
+            "cv_pct": 7.09
+          },
+          "mib_per_s_at_p50": 423.7,
+          "ns_per_byte_at_p50": 2.2507
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.931,
+        "rust-native_over_c-lto": 1.017,
+        "rust-native_over_c-shipped": 0.99
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.787,
+        "rust-native_over_c-lto": 1.878
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_dnp",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2414.063,
+            "p50": 2417.969,
+            "p90": 2450,
+            "p99": 2900,
+            "max": 3278.906,
+            "mean": 2446.802,
+            "stddev": 98.02,
+            "cv_pct": 4.01
+          },
+          "mib_per_s_at_p50": 403.9,
+          "ns_per_byte_at_p50": 2.3613
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2410.938,
+            "p50": 2497.656,
+            "p90": 2521.875,
+            "p99": 2636.719,
+            "max": 2684.375,
+            "mean": 2491.5,
+            "stddev": 40.446,
+            "cv_pct": 1.62
+          },
+          "mib_per_s_at_p50": 391,
+          "ns_per_byte_at_p50": 2.4391
+        },
+        "rust-cabi": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2571.875,
+            "p50": 2574.219,
+            "p90": 2717.188,
+            "p99": 3368.75,
+            "max": 4648.438,
+            "mean": 2637.405,
+            "stddev": 181.673,
+            "cv_pct": 6.89
+          },
+          "mib_per_s_at_p50": 379.4,
+          "ns_per_byte_at_p50": 2.5139
+        },
+        "rust-native": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2570.313,
+            "p50": 2663.281,
+            "p90": 2914.844,
+            "p99": 5017.188,
+            "max": 8673.438,
+            "mean": 2777.406,
+            "stddev": 507.065,
+            "cv_pct": 18.26
+          },
+          "mib_per_s_at_p50": 366.7,
+          "ns_per_byte_at_p50": 2.6009
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.939,
+        "rust-native_over_c-lto": 0.938,
+        "rust-native_over_c-shipped": 0.908
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.861,
+        "rust-native_over_c-lto": 0.526
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_dnp",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.9,
+            "p50": 23.73,
+            "p90": 25.629,
+            "p99": 52.82,
+            "max": 78.888,
+            "mean": 24.69,
+            "stddev": 5.363,
+            "cv_pct": 21.72
+          },
+          "mib_per_s_at_p50": 643,
+          "ns_per_byte_at_p50": 1.4832
+        },
+        "c-lto": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 21.545,
+            "p50": 21.863,
+            "p90": 25.11,
+            "p99": 78.381,
+            "max": 127.771,
+            "mean": 23.913,
+            "stddev": 9.363,
+            "cv_pct": 39.16
+          },
+          "mib_per_s_at_p50": 697.9,
+          "ns_per_byte_at_p50": 1.3664
+        },
+        "rust-cabi": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.839,
+            "p50": 23.047,
+            "p90": 24.231,
+            "p99": 28.394,
+            "max": 39.233,
+            "mean": 23.524,
+            "stddev": 1.415,
+            "cv_pct": 6.01
+          },
+          "mib_per_s_at_p50": 662.1,
+          "ns_per_byte_at_p50": 1.4404
+        },
+        "rust-native": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.833,
+            "p50": 22.931,
+            "p90": 24.75,
+            "p99": 27.411,
+            "max": 32.135,
+            "mean": 23.537,
+            "stddev": 1.138,
+            "cv_pct": 4.83
+          },
+          "mib_per_s_at_p50": 665.4,
+          "ns_per_byte_at_p50": 1.4332
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.03,
+        "rust-native_over_c-lto": 0.953,
+        "rust-native_over_c-shipped": 1.035
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.86,
+        "rust-native_over_c-lto": 2.859
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_dnp",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 589.648,
+            "p50": 590.234,
+            "p90": 630.859,
+            "p99": 743.555,
+            "max": 806.836,
+            "mean": 601.041,
+            "stddev": 29.433,
+            "cv_pct": 4.9
+          },
+          "mib_per_s_at_p50": 413.6,
+          "ns_per_byte_at_p50": 2.3056
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 603.906,
+            "p50": 610.547,
+            "p90": 635.352,
+            "p99": 3613.086,
+            "max": 14278.516,
+            "mean": 745.4,
+            "stddev": 1045.787,
+            "cv_pct": 140.3
+          },
+          "mib_per_s_at_p50": 399.9,
+          "ns_per_byte_at_p50": 2.3849
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 628.125,
+            "p50": 628.711,
+            "p90": 648.242,
+            "p99": 716.797,
+            "max": 983.008,
+            "mean": 636.205,
+            "stddev": 24.294,
+            "cv_pct": 3.82
+          },
+          "mib_per_s_at_p50": 388.3,
+          "ns_per_byte_at_p50": 2.4559
+        },
+        "rust-native": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 646.094,
+            "p50": 649.414,
+            "p90": 661.133,
+            "p99": 889.648,
+            "max": 1708.398,
+            "mean": 661.507,
+            "stddev": 62.502,
+            "cv_pct": 9.45
+          },
+          "mib_per_s_at_p50": 375.9,
+          "ns_per_byte_at_p50": 2.5368
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.939,
+        "rust-native_over_c-lto": 0.94,
+        "rust-native_over_c-shipped": 0.909
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.037,
+        "rust-native_over_c-lto": 4.061
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_dnp",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 132.031,
+            "p50": 132.227,
+            "p90": 139.404,
+            "p99": 168.701,
+            "max": 191.65,
+            "mean": 134.392,
+            "stddev": 6.906,
+            "cv_pct": 5.14
+          },
+          "mib_per_s_at_p50": 461.6,
+          "ns_per_byte_at_p50": 2.066
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 128.809,
+            "p50": 133.447,
+            "p90": 136.084,
+            "p99": 223.975,
+            "max": 252.148,
+            "mean": 135.919,
+            "stddev": 12.735,
+            "cv_pct": 9.37
+          },
+          "mib_per_s_at_p50": 457.4,
+          "ns_per_byte_at_p50": 2.0851
+        },
+        "rust-cabi": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 140.283,
+            "p50": 141.309,
+            "p90": 151.123,
+            "p99": 228.369,
+            "max": 20318.066,
+            "mean": 208.728,
+            "stddev": 1026.638,
+            "cv_pct": 491.85
+          },
+          "mib_per_s_at_p50": 431.9,
+          "ns_per_byte_at_p50": 2.2079
+        },
+        "rust-native": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 138.428,
+            "p50": 138.818,
+            "p90": 153.418,
+            "p99": 203.271,
+            "max": 1176.709,
+            "mean": 145.863,
+            "stddev": 48.268,
+            "cv_pct": 33.09
+          },
+          "mib_per_s_at_p50": 439.7,
+          "ns_per_byte_at_p50": 2.169
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.936,
+        "rust-native_over_c-lto": 0.961,
+        "rust-native_over_c-shipped": 0.953
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.739,
+        "rust-native_over_c-lto": 1.102
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_kermit",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2414.063,
+            "p50": 2418.75,
+            "p90": 2653.125,
+            "p99": 2890.625,
+            "max": 3107.813,
+            "mean": 2474.641,
+            "stddev": 109.763,
+            "cv_pct": 4.44
+          },
+          "mib_per_s_at_p50": 403.7,
+          "ns_per_byte_at_p50": 2.3621
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2467.969,
+            "p50": 2482.031,
+            "p90": 2524.219,
+            "p99": 3289.063,
+            "max": 10214.844,
+            "mean": 2535.722,
+            "stddev": 441.693,
+            "cv_pct": 17.42
+          },
+          "mib_per_s_at_p50": 393.5,
+          "ns_per_byte_at_p50": 2.4239
+        },
+        "rust-cabi": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2571.094,
+            "p50": 2649.219,
+            "p90": 2720.313,
+            "p99": 3532.031,
+            "max": 3903.906,
+            "mean": 2655.83,
+            "stddev": 166.252,
+            "cv_pct": 6.26
+          },
+          "mib_per_s_at_p50": 368.6,
+          "ns_per_byte_at_p50": 2.5871
+        },
+        "rust-native": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2571.094,
+            "p50": 2662.5,
+            "p90": 2867.969,
+            "p99": 3896.094,
+            "max": 5169.531,
+            "mean": 2731.209,
+            "stddev": 256.411,
+            "cv_pct": 9.39
+          },
+          "mib_per_s_at_p50": 366.8,
+          "ns_per_byte_at_p50": 2.6001
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.913,
+        "rust-native_over_c-lto": 0.932,
+        "rust-native_over_c-shipped": 0.908
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.818,
+        "rust-native_over_c-lto": 0.844
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_kermit",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.723,
+            "p50": 22.821,
+            "p90": 24.182,
+            "p99": 27.277,
+            "max": 35.034,
+            "mean": 23.189,
+            "stddev": 1.138,
+            "cv_pct": 4.91
+          },
+          "mib_per_s_at_p50": 668.6,
+          "ns_per_byte_at_p50": 1.4263
+        },
+        "c-lto": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 20.41,
+            "p50": 21.21,
+            "p90": 23.816,
+            "p99": 117.188,
+            "max": 2400.348,
+            "mean": 33.837,
+            "stddev": 142.835,
+            "cv_pct": 422.12
+          },
+          "mib_per_s_at_p50": 719.4,
+          "ns_per_byte_at_p50": 1.3256
+        },
+        "rust-cabi": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.144,
+            "p50": 22.937,
+            "p90": 24.28,
+            "p99": 30.06,
+            "max": 39.343,
+            "mean": 23.303,
+            "stddev": 1.634,
+            "cv_pct": 7.01
+          },
+          "mib_per_s_at_p50": 665.2,
+          "ns_per_byte_at_p50": 1.4336
+        },
+        "rust-native": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.369,
+            "p50": 22.473,
+            "p90": 24.28,
+            "p99": 28.986,
+            "max": 36.011,
+            "mean": 22.984,
+            "stddev": 1.459,
+            "cv_pct": 6.35
+          },
+          "mib_per_s_at_p50": 679,
+          "ns_per_byte_at_p50": 1.4046
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.995,
+        "rust-native_over_c-lto": 0.944,
+        "rust-native_over_c-shipped": 1.015
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.907,
+        "rust-native_over_c-lto": 4.043
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_kermit",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 589.258,
+            "p50": 589.844,
+            "p90": 617.578,
+            "p99": 743.945,
+            "max": 1178.125,
+            "mean": 600.896,
+            "stddev": 39.751,
+            "cv_pct": 6.62
+          },
+          "mib_per_s_at_p50": 413.9,
+          "ns_per_byte_at_p50": 2.3041
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 583.008,
+            "p50": 605.078,
+            "p90": 620.117,
+            "p99": 929.102,
+            "max": 22799.414,
+            "mean": 674.009,
+            "stddev": 1034.629,
+            "cv_pct": 153.5
+          },
+          "mib_per_s_at_p50": 403.5,
+          "ns_per_byte_at_p50": 2.3636
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 627.148,
+            "p50": 627.93,
+            "p90": 685.547,
+            "p99": 855.273,
+            "max": 1071.094,
+            "mean": 642.063,
+            "stddev": 45.084,
+            "cv_pct": 7.02
+          },
+          "mib_per_s_at_p50": 388.8,
+          "ns_per_byte_at_p50": 2.4529
+        },
+        "rust-native": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 645.898,
+            "p50": 648.438,
+            "p90": 657.813,
+            "p99": 717.773,
+            "max": 902.93,
+            "mean": 652.83,
+            "stddev": 17.858,
+            "cv_pct": 2.74
+          },
+          "mib_per_s_at_p50": 376.5,
+          "ns_per_byte_at_p50": 2.533
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.939,
+        "rust-native_over_c-lto": 0.933,
+        "rust-native_over_c-shipped": 0.91
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.87,
+        "rust-native_over_c-lto": 1.294
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_kermit",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 131.494,
+            "p50": 131.689,
+            "p90": 137.842,
+            "p99": 162.842,
+            "max": 195.02,
+            "mean": 133.864,
+            "stddev": 6.568,
+            "cv_pct": 4.91
+          },
+          "mib_per_s_at_p50": 463.5,
+          "ns_per_byte_at_p50": 2.0576
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 131.934,
+            "p50": 133.008,
+            "p90": 135.107,
+            "p99": 172.363,
+            "max": 214.16,
+            "mean": 134.179,
+            "stddev": 6.486,
+            "cv_pct": 4.83
+          },
+          "mib_per_s_at_p50": 458.9,
+          "ns_per_byte_at_p50": 2.0782
+        },
+        "rust-cabi": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 139.355,
+            "p50": 144.531,
+            "p90": 153.369,
+            "p99": 196.777,
+            "max": 883.984,
+            "mean": 148.492,
+            "stddev": 34.469,
+            "cv_pct": 23.21
+          },
+          "mib_per_s_at_p50": 422.3,
+          "ns_per_byte_at_p50": 2.2583
+        },
+        "rust-native": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 138.135,
+            "p50": 138.33,
+            "p90": 139.307,
+            "p99": 168.066,
+            "max": 185.645,
+            "mean": 139.673,
+            "stddev": 5.121,
+            "cv_pct": 3.67
+          },
+          "mib_per_s_at_p50": 441.2,
+          "ns_per_byte_at_p50": 2.1614
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.911,
+        "rust-native_over_c-lto": 0.962,
+        "rust-native_over_c-shipped": 0.952
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.828,
+        "rust-native_over_c-lto": 1.026
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_modbus",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2472.656,
+            "p50": 2478.125,
+            "p90": 2706.25,
+            "p99": 3464.063,
+            "max": 3905.469,
+            "mean": 2569.934,
+            "stddev": 196.123,
+            "cv_pct": 7.63
+          },
+          "mib_per_s_at_p50": 394.1,
+          "ns_per_byte_at_p50": 2.42
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2786.719,
+            "p50": 2857.031,
+            "p90": 3110.156,
+            "p99": 14251.563,
+            "max": 46341.406,
+            "mean": 3264.333,
+            "stddev": 2733.615,
+            "cv_pct": 83.74
+          },
+          "mib_per_s_at_p50": 341.8,
+          "ns_per_byte_at_p50": 2.7901
+        },
+        "rust-cabi": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2571.094,
+            "p50": 2573.438,
+            "p90": 2650,
+            "p99": 3334.375,
+            "max": 3612.5,
+            "mean": 2604.392,
+            "stddev": 116.526,
+            "cv_pct": 4.47
+          },
+          "mib_per_s_at_p50": 379.5,
+          "ns_per_byte_at_p50": 2.5131
+        },
+        "rust-native": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2571.094,
+            "p50": 2572.656,
+            "p90": 2673.438,
+            "p99": 3292.188,
+            "max": 3829.688,
+            "mean": 2615.005,
+            "stddev": 134.627,
+            "cv_pct": 5.15
+          },
+          "mib_per_s_at_p50": 379.6,
+          "ns_per_byte_at_p50": 2.5124
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.963,
+        "rust-native_over_c-lto": 1.111,
+        "rust-native_over_c-shipped": 0.963
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.039,
+        "rust-native_over_c-lto": 4.329
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_modbus",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.87,
+            "p50": 23.23,
+            "p90": 24.597,
+            "p99": 38.159,
+            "max": 108.826,
+            "mean": 24.183,
+            "stddev": 5.816,
+            "cv_pct": 24.05
+          },
+          "mib_per_s_at_p50": 656.9,
+          "ns_per_byte_at_p50": 1.4519
+        },
+        "c-lto": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 24.585,
+            "p50": 24.634,
+            "p90": 25.122,
+            "p99": 34.216,
+            "max": 47.473,
+            "mean": 25.122,
+            "stddev": 1.908,
+            "cv_pct": 7.59
+          },
+          "mib_per_s_at_p50": 619.4,
+          "ns_per_byte_at_p50": 1.5396
+        },
+        "rust-cabi": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 23.669,
+            "p50": 24.084,
+            "p90": 27.039,
+            "p99": 199.89,
+            "max": 523.224,
+            "mean": 29.664,
+            "stddev": 34.518,
+            "cv_pct": 116.36
+          },
+          "mib_per_s_at_p50": 633.6,
+          "ns_per_byte_at_p50": 1.5053
+        },
+        "rust-native": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.021,
+            "p50": 22.186,
+            "p90": 23.553,
+            "p99": 30.023,
+            "max": 34.265,
+            "mean": 22.57,
+            "stddev": 1.394,
+            "cv_pct": 6.18
+          },
+          "mib_per_s_at_p50": 687.8,
+          "ns_per_byte_at_p50": 1.3866
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.965,
+        "rust-native_over_c-lto": 1.11,
+        "rust-native_over_c-shipped": 1.047
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.191,
+        "rust-native_over_c-lto": 1.14
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_modbus",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 603.32,
+            "p50": 603.906,
+            "p90": 660.938,
+            "p99": 833.203,
+            "max": 892.188,
+            "mean": 617.478,
+            "stddev": 35.754,
+            "cv_pct": 5.79
+          },
+          "mib_per_s_at_p50": 404.3,
+          "ns_per_byte_at_p50": 2.359
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 662.305,
+            "p50": 697.266,
+            "p90": 734.375,
+            "p99": 920.508,
+            "max": 1326.953,
+            "mean": 705.348,
+            "stddev": 50.566,
+            "cv_pct": 7.17
+          },
+          "mib_per_s_at_p50": 350.1,
+          "ns_per_byte_at_p50": 2.7237
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 627.93,
+            "p50": 647.656,
+            "p90": 667.188,
+            "p99": 841.016,
+            "max": 1701.563,
+            "mean": 655.099,
+            "stddev": 78,
+            "cv_pct": 11.91
+          },
+          "mib_per_s_at_p50": 377,
+          "ns_per_byte_at_p50": 2.5299
+        },
+        "rust-native": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 627.148,
+            "p50": 627.734,
+            "p90": 685.938,
+            "p99": 837.5,
+            "max": 1284.375,
+            "mean": 643.529,
+            "stddev": 49.741,
+            "cv_pct": 7.73
+          },
+          "mib_per_s_at_p50": 388.9,
+          "ns_per_byte_at_p50": 2.4521
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.932,
+        "rust-native_over_c-lto": 1.111,
+        "rust-native_over_c-shipped": 0.962
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.991,
+        "rust-native_over_c-lto": 1.099
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_modbus",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 132.52,
+            "p50": 133.057,
+            "p90": 147.266,
+            "p99": 162.988,
+            "max": 242.969,
+            "mean": 136.438,
+            "stddev": 8.093,
+            "cv_pct": 5.93
+          },
+          "mib_per_s_at_p50": 458.7,
+          "ns_per_byte_at_p50": 2.079
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 156.299,
+            "p50": 158.643,
+            "p90": 162.061,
+            "p99": 251.953,
+            "max": 719.141,
+            "mean": 162.666,
+            "stddev": 29.59,
+            "cv_pct": 18.19
+          },
+          "mib_per_s_at_p50": 384.7,
+          "ns_per_byte_at_p50": 2.4788
+        },
+        "rust-cabi": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 141.895,
+            "p50": 142.627,
+            "p90": 147.852,
+            "p99": 177.344,
+            "max": 212.549,
+            "mean": 144.951,
+            "stddev": 6.766,
+            "cv_pct": 4.67
+          },
+          "mib_per_s_at_p50": 427.9,
+          "ns_per_byte_at_p50": 2.2285
+        },
+        "rust-native": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 137.988,
+            "p50": 138.477,
+            "p90": 139.404,
+            "p99": 168.262,
+            "max": 192.139,
+            "mean": 139.895,
+            "stddev": 5.721,
+            "cv_pct": 4.09
+          },
+          "mib_per_s_at_p50": 440.8,
+          "ns_per_byte_at_p50": 2.1637
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.933,
+        "rust-native_over_c-lto": 1.146,
+        "rust-native_over_c-shipped": 0.961
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.919,
+        "rust-native_over_c-lto": 1.497
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_sick",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 64,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 3237.5,
+            "p50": 3304.688,
+            "p90": 3357.813,
+            "p99": 4223.438,
+            "max": 5359.375,
+            "mean": 3350.488,
+            "stddev": 206.285,
+            "cv_pct": 6.16
+          },
+          "mib_per_s_at_p50": 295.5,
+          "ns_per_byte_at_p50": 3.2272
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2541.406,
+            "p50": 2625.781,
+            "p90": 2744.531,
+            "p99": 4103.125,
+            "max": 13155.469,
+            "mean": 2701.989,
+            "stddev": 526.402,
+            "cv_pct": 19.48
+          },
+          "mib_per_s_at_p50": 371.9,
+          "ns_per_byte_at_p50": 2.5642
+        },
+        "rust-cabi": {
+          "batch_calls": 256,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 1212.891,
+            "p50": 1214.063,
+            "p90": 1288.281,
+            "p99": 1594.922,
+            "max": 1751.953,
+            "mean": 1234.784,
+            "stddev": 69.055,
+            "cv_pct": 5.59
+          },
+          "mib_per_s_at_p50": 804.4,
+          "ns_per_byte_at_p50": 1.1856
+        },
+        "rust-native": {
+          "batch_calls": 256,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 1217.578,
+            "p50": 1256.641,
+            "p90": 1466.797,
+            "p99": 2242.969,
+            "max": 5177.344,
+            "mean": 1321.984,
+            "stddev": 253.749,
+            "cv_pct": 19.19
+          },
+          "mib_per_s_at_p50": 777.1,
+          "ns_per_byte_at_p50": 1.2272
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 2.722,
+        "rust-native_over_c-lto": 2.09,
+        "rust-native_over_c-shipped": 2.63
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 2.648,
+        "rust-native_over_c-lto": 1.829
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_sick",
+      "bytes": 1048576,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 3860000,
+            "p50": 4091900,
+            "p90": 6406000,
+            "p99": 12928700,
+            "max": 21113800,
+            "mean": 4799854,
+            "stddev": 2071358.341,
+            "cv_pct": 43.15
+          },
+          "mib_per_s_at_p50": 244.4,
+          "ns_per_byte_at_p50": 3.9023
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 3896000,
+            "p50": 4077600,
+            "p90": 5875400,
+            "p99": 18543900,
+            "max": 50545800,
+            "mean": 5089066.5,
+            "stddev": 4454334.847,
+            "cv_pct": 87.53
+          },
+          "mib_per_s_at_p50": 245.2,
+          "ns_per_byte_at_p50": 3.8887
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 1247600,
+            "p50": 1253600,
+            "p90": 1313200,
+            "p99": 1434300,
+            "max": 1477700,
+            "mean": 1271578.5,
+            "stddev": 39021.422,
+            "cv_pct": 3.07
+          },
+          "mib_per_s_at_p50": 797.7,
+          "ns_per_byte_at_p50": 1.1955
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 200,
+          "ns_per_call": {
+            "min": 1244100,
+            "p50": 1250200,
+            "p90": 1312500,
+            "p99": 1604200,
+            "max": 1768600,
+            "mean": 1274125.5,
+            "stddev": 69541.443,
+            "cv_pct": 5.46
+          },
+          "mib_per_s_at_p50": 799.9,
+          "ns_per_byte_at_p50": 1.1923
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 3.264,
+        "rust-native_over_c-lto": 3.262,
+        "rust-native_over_c-shipped": 3.273
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 9.014,
+        "rust-native_over_c-lto": 11.56
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_sick",
+      "bytes": 104857600,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 393872700,
+            "p50": 400816500,
+            "p90": 406799900,
+            "p99": 447932300,
+            "max": 447932300,
+            "mean": 402293712,
+            "stddev": 10304584.474,
+            "cv_pct": 2.56
+          },
+          "mib_per_s_at_p50": 249.5,
+          "ns_per_byte_at_p50": 3.8225
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 406903700,
+            "p50": 434262800,
+            "p90": 462858700,
+            "p99": 470171000,
+            "max": 470171000,
+            "mean": 435115624,
+            "stddev": 17514663.964,
+            "cv_pct": 4.03
+          },
+          "mib_per_s_at_p50": 230.3,
+          "ns_per_byte_at_p50": 4.1415
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 126305300,
+            "p50": 128267300,
+            "p90": 132293500,
+            "p99": 184589400,
+            "max": 184589400,
+            "mean": 131161596,
+            "stddev": 11406415.381,
+            "cv_pct": 8.7
+          },
+          "mib_per_s_at_p50": 779.6,
+          "ns_per_byte_at_p50": 1.2233
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 25,
+          "ns_per_call": {
+            "min": 126544700,
+            "p50": 130681800,
+            "p90": 137361100,
+            "p99": 162425800,
+            "max": 162425800,
+            "mean": 132410288,
+            "stddev": 7570594.25,
+            "cv_pct": 5.72
+          },
+          "mib_per_s_at_p50": 765.2,
+          "ns_per_byte_at_p50": 1.2463
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 3.125,
+        "rust-native_over_c-lto": 3.323,
+        "rust-native_over_c-shipped": 3.067
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 2.427,
+        "rust-native_over_c-lto": 2.895
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_sick",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 13.129,
+            "p50": 13.702,
+            "p90": 22.882,
+            "p99": 36.737,
+            "max": 44.006,
+            "mean": 16.385,
+            "stddev": 5.091,
+            "cv_pct": 31.07
+          },
+          "mib_per_s_at_p50": 1113.6,
+          "ns_per_byte_at_p50": 0.8564
+        },
+        "c-lto": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 13.58,
+            "p50": 13.672,
+            "p90": 18.604,
+            "p99": 28.51,
+            "max": 36.23,
+            "mean": 14.691,
+            "stddev": 2.942,
+            "cv_pct": 20.03
+          },
+          "mib_per_s_at_p50": 1116.1,
+          "ns_per_byte_at_p50": 0.8545
+        },
+        "rust-cabi": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 16.266,
+            "p50": 16.309,
+            "p90": 18.097,
+            "p99": 19.409,
+            "max": 20.197,
+            "mean": 16.706,
+            "stddev": 0.739,
+            "cv_pct": 4.42
+          },
+          "mib_per_s_at_p50": 935.6,
+          "ns_per_byte_at_p50": 1.0193
+        },
+        "rust-native": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 15.93,
+            "p50": 15.973,
+            "p90": 17.932,
+            "p99": 20.483,
+            "max": 22.992,
+            "mean": 16.532,
+            "stddev": 1.123,
+            "cv_pct": 6.79
+          },
+          "mib_per_s_at_p50": 955.3,
+          "ns_per_byte_at_p50": 0.9983
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.84,
+        "rust-native_over_c-lto": 0.856,
+        "rust-native_over_c-shipped": 0.858
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.893,
+        "rust-native_over_c-lto": 1.392
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_sick",
+      "bytes": 16777216,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 62711400,
+            "p50": 63718400,
+            "p90": 64725700,
+            "p99": 139850400,
+            "max": 139850400,
+            "mean": 65101296.667,
+            "stddev": 9886260.628,
+            "cv_pct": 15.19
+          },
+          "mib_per_s_at_p50": 251.1,
+          "ns_per_byte_at_p50": 3.7979
+        },
+        "c-lto": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 63017300,
+            "p50": 64843000,
+            "p90": 78685000,
+            "p99": 143361800,
+            "max": 143361800,
+            "mean": 69030095,
+            "stddev": 11313267.367,
+            "cv_pct": 16.39
+          },
+          "mib_per_s_at_p50": 246.7,
+          "ns_per_byte_at_p50": 3.8649
+        },
+        "rust-cabi": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 20029500,
+            "p50": 20316700,
+            "p90": 20972100,
+            "p99": 22860500,
+            "max": 22860500,
+            "mean": 20485640,
+            "stddev": 461815.873,
+            "cv_pct": 2.25
+          },
+          "mib_per_s_at_p50": 787.5,
+          "ns_per_byte_at_p50": 1.211
+        },
+        "rust-native": {
+          "batch_calls": 1,
+          "samples": 60,
+          "ns_per_call": {
+            "min": 20074600,
+            "p50": 20479700,
+            "p90": 20917500,
+            "p99": 22249700,
+            "max": 22249700,
+            "mean": 20557448.333,
+            "stddev": 411927.331,
+            "cv_pct": 2
+          },
+          "mib_per_s_at_p50": 781.3,
+          "ns_per_byte_at_p50": 1.2207
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 3.136,
+        "rust-native_over_c-lto": 3.166,
+        "rust-native_over_c-shipped": 3.111
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 6.118,
+        "rust-native_over_c-lto": 6.443
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_sick",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 295.313,
+            "p50": 322.656,
+            "p90": 371.289,
+            "p99": 560.352,
+            "max": 1042.578,
+            "mean": 337.202,
+            "stddev": 58.753,
+            "cv_pct": 17.42
+          },
+          "mib_per_s_at_p50": 756.7,
+          "ns_per_byte_at_p50": 1.2604
+        },
+        "c-lto": {
+          "batch_calls": 1024,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 202.246,
+            "p50": 210.059,
+            "p90": 220.215,
+            "p99": 1251.074,
+            "max": 2386.816,
+            "mean": 256.17,
+            "stddev": 210.677,
+            "cv_pct": 82.24
+          },
+          "mib_per_s_at_p50": 1162.3,
+          "ns_per_byte_at_p50": 0.8205
+        },
+        "rust-cabi": {
+          "batch_calls": 1024,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 303.906,
+            "p50": 304.199,
+            "p90": 322.07,
+            "p99": 431.25,
+            "max": 567.48,
+            "mean": 313.268,
+            "stddev": 27.52,
+            "cv_pct": 8.78
+          },
+          "mib_per_s_at_p50": 802.6,
+          "ns_per_byte_at_p50": 1.1883
+        },
+        "rust-native": {
+          "batch_calls": 1024,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 304.59,
+            "p50": 314.258,
+            "p90": 318.848,
+            "p99": 379.297,
+            "max": 631.152,
+            "mean": 317.601,
+            "stddev": 22.538,
+            "cv_pct": 7.1
+          },
+          "mib_per_s_at_p50": 776.9,
+          "ns_per_byte_at_p50": 1.2276
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.061,
+        "rust-native_over_c-lto": 0.668,
+        "rust-native_over_c-shipped": 1.027
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.299,
+        "rust-native_over_c-lto": 3.298
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_sick",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 4096,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 49.146,
+            "p50": 49.268,
+            "p90": 49.805,
+            "p99": 58.618,
+            "max": 102.002,
+            "mean": 49.842,
+            "stddev": 2.988,
+            "cv_pct": 5.99
+          },
+          "mib_per_s_at_p50": 1238.9,
+          "ns_per_byte_at_p50": 0.7698
+        },
+        "c-lto": {
+          "batch_calls": 4096,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 49.976,
+            "p50": 52.173,
+            "p90": 54.663,
+            "p99": 84.351,
+            "max": 131.543,
+            "mean": 53.724,
+            "stddev": 7.025,
+            "cv_pct": 13.08
+          },
+          "mib_per_s_at_p50": 1169.9,
+          "ns_per_byte_at_p50": 0.8152
+        },
+        "rust-cabi": {
+          "batch_calls": 4096,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 75,
+            "p50": 79.395,
+            "p90": 85.522,
+            "p99": 697.412,
+            "max": 1601.733,
+            "mean": 101.644,
+            "stddev": 126.829,
+            "cv_pct": 124.78
+          },
+          "mib_per_s_at_p50": 768.8,
+          "ns_per_byte_at_p50": 1.2405
+        },
+        "rust-native": {
+          "batch_calls": 4096,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 74.463,
+            "p50": 74.805,
+            "p90": 76.782,
+            "p99": 88.086,
+            "max": 140.82,
+            "mean": 75.619,
+            "stddev": 3.919,
+            "cv_pct": 5.18
+          },
+          "mib_per_s_at_p50": 815.9,
+          "ns_per_byte_at_p50": 1.1688
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.621,
+        "rust-native_over_c-lto": 0.697,
+        "rust-native_over_c-shipped": 0.659
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.084,
+        "rust-native_over_c-lto": 0.958
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_xmodem",
+      "bytes": 1024,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2690.625,
+            "p50": 2701.563,
+            "p90": 2928.125,
+            "p99": 3846.875,
+            "max": 6992.188,
+            "mean": 2779.859,
+            "stddev": 261.923,
+            "cv_pct": 9.42
+          },
+          "mib_per_s_at_p50": 361.5,
+          "ns_per_byte_at_p50": 2.6382
+        },
+        "c-lto": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2687.5,
+            "p50": 2789.063,
+            "p90": 2895.313,
+            "p99": 5265.625,
+            "max": 23573.438,
+            "mean": 2915.488,
+            "stddev": 1197.286,
+            "cv_pct": 41.07
+          },
+          "mib_per_s_at_p50": 350.1,
+          "ns_per_byte_at_p50": 2.7237
+        },
+        "rust-cabi": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2695.313,
+            "p50": 2696.094,
+            "p90": 2700,
+            "p99": 3247.656,
+            "max": 4112.5,
+            "mean": 2720.113,
+            "stddev": 121.8,
+            "cv_pct": 4.48
+          },
+          "mib_per_s_at_p50": 362.2,
+          "ns_per_byte_at_p50": 2.6329
+        },
+        "rust-native": {
+          "batch_calls": 128,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 2776.563,
+            "p50": 2790.625,
+            "p90": 3150.781,
+            "p99": 22286.719,
+            "max": 218646.094,
+            "mean": 4109.673,
+            "stddev": 12686.712,
+            "cv_pct": 308.7
+          },
+          "mib_per_s_at_p50": 349.9,
+          "ns_per_byte_at_p50": 2.7252
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.002,
+        "rust-native_over_c-lto": 0.999,
+        "rust-native_over_c-shipped": 0.968
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.185,
+        "rust-native_over_c-lto": 0.236
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_xmodem",
+      "bytes": 16,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 24.609,
+            "p50": 24.78,
+            "p90": 25.391,
+            "p99": 32.361,
+            "max": 41.638,
+            "mean": 25.233,
+            "stddev": 1.655,
+            "cv_pct": 6.56
+          },
+          "mib_per_s_at_p50": 615.8,
+          "ns_per_byte_at_p50": 1.5488
+        },
+        "c-lto": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.015,
+            "p50": 22.937,
+            "p90": 24.17,
+            "p99": 26.489,
+            "max": 31.024,
+            "mean": 23.128,
+            "stddev": 1.033,
+            "cv_pct": 4.47
+          },
+          "mib_per_s_at_p50": 665.2,
+          "ns_per_byte_at_p50": 1.4336
+        },
+        "rust-cabi": {
+          "batch_calls": 8192,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 24.609,
+            "p50": 24.927,
+            "p90": 25.989,
+            "p99": 31.653,
+            "max": 42.896,
+            "mean": 25.44,
+            "stddev": 1.6,
+            "cv_pct": 6.29
+          },
+          "mib_per_s_at_p50": 612.1,
+          "ns_per_byte_at_p50": 1.5579
+        },
+        "rust-native": {
+          "batch_calls": 16384,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 22.748,
+            "p50": 23.474,
+            "p90": 25.037,
+            "p99": 33.85,
+            "max": 39.404,
+            "mean": 23.849,
+            "stddev": 1.995,
+            "cv_pct": 8.37
+          },
+          "mib_per_s_at_p50": 650,
+          "ns_per_byte_at_p50": 1.4671
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.994,
+        "rust-native_over_c-lto": 0.977,
+        "rust-native_over_c-shipped": 1.056
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.022,
+        "rust-native_over_c-lto": 0.783
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_xmodem",
+      "bytes": 256,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 653.32,
+            "p50": 673.438,
+            "p90": 712.695,
+            "p99": 1027.539,
+            "max": 2207.813,
+            "mean": 685.836,
+            "stddev": 89.787,
+            "cv_pct": 13.09
+          },
+          "mib_per_s_at_p50": 362.5,
+          "ns_per_byte_at_p50": 2.6306
+        },
+        "c-lto": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 652.148,
+            "p50": 676.172,
+            "p90": 688.477,
+            "p99": 840.82,
+            "max": 1319.727,
+            "mean": 683.014,
+            "stddev": 44.18,
+            "cv_pct": 6.47
+          },
+          "mib_per_s_at_p50": 361.1,
+          "ns_per_byte_at_p50": 2.6413
+        },
+        "rust-cabi": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 657.227,
+            "p50": 657.617,
+            "p90": 677.344,
+            "p99": 750.195,
+            "max": 865.234,
+            "mean": 662.658,
+            "stddev": 18.325,
+            "cv_pct": 2.77
+          },
+          "mib_per_s_at_p50": 371.3,
+          "ns_per_byte_at_p50": 2.5688
+        },
+        "rust-native": {
+          "batch_calls": 512,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 676.758,
+            "p50": 679.688,
+            "p90": 689.844,
+            "p99": 876.758,
+            "max": 1330.859,
+            "mean": 689.254,
+            "stddev": 49.306,
+            "cv_pct": 7.15
+          },
+          "mib_per_s_at_p50": 359.2,
+          "ns_per_byte_at_p50": 2.655
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 1.024,
+        "rust-native_over_c-lto": 0.995,
+        "rust-native_over_c-shipped": 0.991
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 1.37,
+        "rust-native_over_c-lto": 0.959
+      }
+    },
+    {
+      "kind": "oneshot",
+      "algo": "crc_xmodem",
+      "bytes": 64,
+      "per_config": {
+        "c-shipped": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 142.285,
+            "p50": 142.676,
+            "p90": 149.854,
+            "p99": 175.537,
+            "max": 206.934,
+            "mean": 145.755,
+            "stddev": 6.875,
+            "cv_pct": 4.72
+          },
+          "mib_per_s_at_p50": 427.8,
+          "ns_per_byte_at_p50": 2.2293
+        },
+        "c-lto": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 144.775,
+            "p50": 146.631,
+            "p90": 158.252,
+            "p99": 263.086,
+            "max": 1653.467,
+            "mean": 155.763,
+            "stddev": 74.05,
+            "cv_pct": 47.54
+          },
+          "mib_per_s_at_p50": 416.3,
+          "ns_per_byte_at_p50": 2.2911
+        },
+        "rust-cabi": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 145.605,
+            "p50": 145.947,
+            "p90": 153.174,
+            "p99": 175.928,
+            "max": 417.822,
+            "mean": 148.808,
+            "stddev": 13.827,
+            "cv_pct": 9.29
+          },
+          "mib_per_s_at_p50": 418.2,
+          "ns_per_byte_at_p50": 2.2804
+        },
+        "rust-native": {
+          "batch_calls": 2048,
+          "samples": 500,
+          "ns_per_call": {
+            "min": 143.359,
+            "p50": 143.555,
+            "p90": 157.91,
+            "p99": 192.041,
+            "max": 271.582,
+            "mean": 147.435,
+            "stddev": 10.965,
+            "cv_pct": 7.44
+          },
+          "mib_per_s_at_p50": 425.2,
+          "ns_per_byte_at_p50": 2.243
+        }
+      },
+      "speedup_p50": {
+        "rust-cabi_over_c-shipped": 0.978,
+        "rust-native_over_c-lto": 1.021,
+        "rust-native_over_c-shipped": 0.994
+      },
+      "speedup_p99": {
+        "rust-cabi_over_c-shipped": 0.998,
+        "rust-native_over_c-lto": 1.37
+      }
+    }
+  ]
+}

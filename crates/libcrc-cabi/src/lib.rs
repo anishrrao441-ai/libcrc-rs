@@ -19,7 +19,8 @@
 //! NULL pointer rather than faulting (`src/crc16.c:63`). `checksum_NMEA` instead returns
 //! NULL for either argument being NULL (`src/nmea-chk.c`). Both behaviours are observable
 //! through the public API, so both are reproduced exactly.
-#![allow(non_snake_case)] // `checksum_NMEA` must match the C symbol exactly.
+#![allow(non_snake_case)]
+// `checksum_NMEA` must match the C symbol exactly.
 // The C ABI dictates these signatures: libcrc's callers pass `(const unsigned char *,
 // size_t)`, so the exported functions must take raw pointers and cannot be marked
 // `unsafe` without breaking the ABI the original test suite links against. Every
@@ -167,7 +168,11 @@ pub extern "C" fn checksum_NMEA(input_str: *const u8, result: *mut u8) -> *mut u
     let checksum = libcrc_rs::checksum_nmea(sentence);
 
     const HEX: &[u8; 16] = b"0123456789ABCDEF";
-    let digits = [HEX[(checksum >> 4) as usize], HEX[(checksum & 0x0F) as usize], 0u8];
+    let digits = [
+        HEX[(checksum >> 4) as usize],
+        HEX[(checksum & 0x0F) as usize],
+        0u8,
+    ];
     // SAFETY: justified in UNSAFE.md (U-3). The C contract requires `result` to point to
     // at least 3 writable bytes; the original writes the same 3 via snprintf(result, 3, ..).
     unsafe {

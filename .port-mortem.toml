@@ -1,0 +1,48 @@
+# Port Mortem 2026 — submission manifest
+# https://coderesurrection.com/2026/
+
+track = "C -> Rust"
+
+[source]
+name       = "libcrc"
+url        = "https://github.com/lammertb/libcrc"
+author     = "Lammert Bies"
+license    = "MIT"
+selected_from = "official pre-vetted repo pool (https://coderesurrection.com/2026/repo-pool/)"
+# Measured on the cloned tree, not estimated:
+files      = 19          # .c and .h
+lines_physical = 2354
+lines_code     = 996
+lines_comment  = 915
+lines_blank    = 443
+
+[port]
+name     = "libcrc-rs"
+language = "Rust"
+edition  = "2021"
+rustc    = "1.96.0"
+license  = "MIT"          # same as the original
+crates   = ["crates/libcrc-rs (the port, forbid(unsafe_code))",
+            "crates/libcrc-cabi (C ABI shim; test harness, not the port)"]
+
+[window]
+kickoff_utc = "2026-07-31T18:00:00Z"
+freeze_utc  = "2026-08-03T18:00:00Z"
+# The repository was created after kickoff; `git log --reverse -1 --format=%cI` is the proof.
+
+[tests]
+# tests/original/ is a verbatim copy of the original suite, hashed at import and
+# never edited. Verify at any time with: sha256sum -c tests/original.sha256
+manifest = "tests/original.sha256"
+files    = 4
+verification = "The unmodified C tests are compiled and linked against the Rust staticlib. Nothing links the original libcrc.a."
+
+[evidence]
+one_command_build = "./build.sh"
+differential_fuzz = "fuzz/log.txt"
+fuzz_negative_control = "fuzz/negative-control.log"
+exhaustive_parity = "tests/parity/"
+concurrency_soak  = "tests/concurrency/RESULTS.md"
+benchmarks        = "bench/results.json"
+unsafe_census     = "UNSAFE.md"
+decision_log      = "DECISIONS.md"

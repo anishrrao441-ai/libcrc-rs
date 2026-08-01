@@ -40,7 +40,9 @@ impl Crc16Digest {
 
     /// Absorb a chunk. May be called any number of times.
     pub fn update(&mut self, data: &[u8]) {
-        self.crc = data.iter().fold(self.crc, |crc, &b| super::update_crc_16(crc, b));
+        self.crc = data
+            .iter()
+            .fold(self.crc, |crc, &b| super::update_crc_16(crc, b));
     }
 
     /// Consume the digest and return the checksum.
@@ -75,7 +77,9 @@ impl Crc32Digest {
     }
 
     pub fn update(&mut self, data: &[u8]) {
-        self.crc = data.iter().fold(self.crc, |crc, &b| super::update_crc_32(crc, b));
+        self.crc = data
+            .iter()
+            .fold(self.crc, |crc, &b| super::update_crc_32(crc, b));
     }
 
     /// Consume the digest, applying the final XOR.
@@ -101,16 +105,24 @@ pub struct Crc64Digest {
 impl Crc64Digest {
     /// CRC-64/ECMA: seed `0`, no final XOR.
     pub const fn new() -> Self {
-        Self { crc: 0, final_xor: 0 }
+        Self {
+            crc: 0,
+            final_xor: 0,
+        }
     }
 
     /// CRC-64/WE: seed all-ones, final XOR all-ones.
     pub const fn we() -> Self {
-        Self { crc: u64::MAX, final_xor: u64::MAX }
+        Self {
+            crc: u64::MAX,
+            final_xor: u64::MAX,
+        }
     }
 
     pub fn update(&mut self, data: &[u8]) {
-        self.crc = data.iter().fold(self.crc, |crc, &b| super::update_crc_64(crc, b));
+        self.crc = data
+            .iter()
+            .fold(self.crc, |crc, &b| super::update_crc_64(crc, b));
     }
 
     pub const fn finalize(self) -> u64 {
@@ -155,7 +167,9 @@ impl Default for Crc32DigestState {
 
 impl Hasher for Crc32Hasher {
     fn write(&mut self, bytes: &[u8]) {
-        self.digest.0 = bytes.iter().fold(self.digest.0, |crc, &b| super::update_crc_32(crc, b));
+        self.digest.0 = bytes
+            .iter()
+            .fold(self.digest.0, |crc, &b| super::update_crc_32(crc, b));
     }
 
     fn finish(&self) -> u64 {

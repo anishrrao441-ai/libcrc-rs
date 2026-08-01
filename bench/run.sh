@@ -101,6 +101,25 @@ stage_main() {
   wc -l "$RAW"/samples_*.txt
 }
 
+# An independent repeat of the whole sweep, in a separate set of processes and
+# minutes later. Nothing is averaged across the two: rep2 exists so the report
+# can state how much of the run-to-run spread is the machine rather than the
+# code. A p50 that moves by 15% between identical runs is not a 5% result.
+stage_main2() {
+  echo "== repeat sweep for run-to-run reproducibility =="
+  "$BUILD/bench_c_shipped.exe" run c-shipped   > "$RAW/rep2_c-shipped.txt"
+  "$BUILD/bench_c_lto.exe"     run c-lto       > "$RAW/rep2_c-lto.txt"
+  "$BUILD/bench_rustcabi.exe"  run rust-cabi   > "$RAW/rep2_rust-cabi.txt"
+  "$BUILD/bench_rs.exe"        run rust-native > "$RAW/rep2_rust-native.txt"
+}
+
+stage_probe() {
+  echo "== codegen control experiments (branch vs cmov, snprintf vs hex table) =="
+  gcc -O3 -funsigned-char -Wall -Wextra -std=c99 \
+      -o "$BUILD/probe_codegen.exe" "$BENCH/c/probe_codegen.c"
+  "$BUILD/probe_codegen.exe" 2>/dev/null | tee "$RAW/probe_codegen.txt"
+}
+
 stage_rss() {
   echo "== peak RSS, 5 repeats per (binary, profile) =="
   : > "$RAW/rss.txt"
@@ -140,11 +159,12 @@ stage_firstcall() {
   : > "$RAW/firstcall.txt"
   for algo in crc_16 crc_ccitt_ffff crc_kermit crc_32 crc_8; do
     for b in bench_c_shipped bench_c_lto bench_rustcabi bench_rs; do
-      printf '### %s %s ' "$b" "$algo" >> "$RAW/firstcall.txt"
-      for _ in $(seq 150); do
-        printf '%s,' "$("$BUILD/$b.exe" firstcall "$algo")" >> "$RAW/firstcall.txt"
-      done
-      echo >> "$RAW/firstcall.txt"
+      # One value per line under a header. Do NOT reassemble these into a CSV
+      # row with paste/tr: MSYS paste merged records here, silently splicing
+      # two binaries' samples onto one line.
+      echo "### $b $algo" >> "$RAW/firstcall.txt"
+      for _ in $(seq 150); do "$BUILD/$b.exe" firstcall "$algo"; done \
+        >> "$RAW/firstcall.txt"
     done
   done
   echo "wrote $RAW/firstcall.txt"
@@ -161,12 +181,14 @@ case "$stage" in
   clock)       stage_clock ;;
   rssvalidate) stage_rssvalidate ;;
   main)        stage_main ;;
+  main2)       stage_main2 ;;
+  probe)       stage_probe ;;
   rss)         stage_rss ;;
   startup)     stage_startup ;;
   firstcall)   stage_firstcall ;;
   analyze)     stage_analyze ;;
   all)
-    stage_build; stage_clock; stage_rssvalidate; stage_main
-    stage_rss; stage_startup; stage_firstcall; stage_analyze ;;
+    stage_build; stage_clock; stage_rssvalidate; stage_main; stage_main2
+    stage_probe; stage_rss; stage_startup; stage_firstcall; stage_analyze ;;
   *) echo "unknown stage: $stage" >&2; exit 1 ;;
 esac

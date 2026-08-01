@@ -144,7 +144,9 @@ mod tests {
     /// combining the halves must reproduce the whole.
     #[test]
     fn combine_is_associative_over_every_split_point() {
-        let data: Vec<u8> = (0u32..=512).map(|i| (i.wrapping_mul(2654435761) >> 13) as u8).collect();
+        let data: Vec<u8> = (0u32..=512)
+            .map(|i| (i.wrapping_mul(2654435761) >> 13) as u8)
+            .collect();
         let whole = crc_32(&data);
         for split in 0..data.len() {
             let (a, b) = data.split_at(split);
@@ -160,7 +162,11 @@ mod tests {
     /// Three-way combination must also hold, which exercises the operator powers.
     #[test]
     fn combine_chains_across_three_blocks() {
-        let (a, b, c) = (b"alpha".as_slice(), b"bravo!!".as_slice(), b"charlie123".as_slice());
+        let (a, b, c) = (
+            b"alpha".as_slice(),
+            b"bravo!!".as_slice(),
+            b"charlie123".as_slice(),
+        );
         let ab = crc_32_combine(crc_32(a), crc_32(b), b.len());
         let abc = crc_32_combine(ab, crc_32(c), c.len());
         let joined = concat(&concat(a, b), c);

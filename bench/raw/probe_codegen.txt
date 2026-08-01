@@ -1,0 +1,10 @@
+# variants verified bit-identical before timing
+# gcc, same -O3 -funsigned-char, same machine, same clock
+
+== CONTROL 1: crc_sick over 1 MiB, ns/byte ==
+C, libcrc's own branchy form       p50=    3.856  p90=    4.055  p99=    4.764  min=    3.733
+C, same algorithm, mask form       p50=    1.270  p90=    1.312  p99=    1.948  min=    1.268
+
+== CONTROL 2: checksum_NMEA over 256 B, ns/call ==
+C, libcrc's snprintf form          p50=  272.125  p90=  288.010  p99=  466.005  min=  261.210
+C, hex-table form (as the port)    p50=  168.945  p90=  180.630  p99=  203.895  min=  161.560

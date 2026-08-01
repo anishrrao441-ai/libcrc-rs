@@ -14,7 +14,10 @@ fn main() {
     acc = 0;
     for crc in 0u32..256 {
         for byte in 0u32..256 {
-            mix(&mut acc, libcrc_rs::update_crc_8(crc as u8, byte as u8) as u64);
+            mix(
+                &mut acc,
+                libcrc_rs::update_crc_8(crc as u8, byte as u8) as u64,
+            );
         }
     }
     println!("update_crc_8 {:016X}", acc);
@@ -23,7 +26,10 @@ fn main() {
     acc = 0;
     for crc in 0u32..65536 {
         for byte in 0u32..256 {
-            mix(&mut acc, libcrc_rs::update_crc_16(crc as u16, byte as u8) as u64);
+            mix(
+                &mut acc,
+                libcrc_rs::update_crc_16(crc as u16, byte as u8) as u64,
+            );
         }
     }
     println!("update_crc_16 {:016X}", acc);
@@ -32,7 +38,10 @@ fn main() {
     acc = 0;
     for crc in 0u32..65536 {
         for byte in 0u32..256 {
-            mix(&mut acc, libcrc_rs::update_crc_ccitt(crc as u16, byte as u8) as u64);
+            mix(
+                &mut acc,
+                libcrc_rs::update_crc_ccitt(crc as u16, byte as u8) as u64,
+            );
         }
     }
     println!("update_crc_ccitt {:016X}", acc);
@@ -41,7 +50,10 @@ fn main() {
     acc = 0;
     for crc in 0u32..65536 {
         for byte in 0u32..256 {
-            mix(&mut acc, libcrc_rs::update_crc_kermit(crc as u16, byte as u8) as u64);
+            mix(
+                &mut acc,
+                libcrc_rs::update_crc_kermit(crc as u16, byte as u8) as u64,
+            );
         }
     }
     println!("update_crc_kermit {:016X}", acc);
@@ -50,7 +62,10 @@ fn main() {
     acc = 0;
     for crc in 0u32..65536 {
         for byte in 0u32..256 {
-            mix(&mut acc, libcrc_rs::update_crc_dnp(crc as u16, byte as u8) as u64);
+            mix(
+                &mut acc,
+                libcrc_rs::update_crc_dnp(crc as u16, byte as u8) as u64,
+            );
         }
     }
     println!("update_crc_dnp {:016X}", acc);
@@ -76,7 +91,10 @@ fn main() {
     let mut c: u64 = 0;
     while c < 0x1_0000_0000 {
         for byte in 0u32..256 {
-            mix(&mut acc, libcrc_rs::update_crc_32(c as u32, byte as u8) as u64);
+            mix(
+                &mut acc,
+                libcrc_rs::update_crc_32(c as u32, byte as u8) as u64,
+            );
         }
         c += 0x1_0001;
     }

@@ -285,7 +285,10 @@ pub fn crc_xmodem(data: &[u8]) -> u16 {
 /// Byte-swaps the final value, diverging from the RevEng catalogue: libcrc returns
 /// `0x8921` for `b"123456789"` where the catalogue specifies `0x2189`.
 pub fn crc_kermit(data: &[u8]) -> u16 {
-    byteswap(data.iter().fold(START_KERMIT, |crc, &b| update_crc_kermit(crc, b)))
+    byteswap(
+        data.iter()
+            .fold(START_KERMIT, |crc, &b| update_crc_kermit(crc, b)),
+    )
 }
 
 /// CRC-16/DNP. libcrc `crc_dnp()`.
@@ -293,7 +296,11 @@ pub fn crc_kermit(data: &[u8]) -> u16 {
 /// Complements *then* byte-swaps, diverging from the RevEng catalogue: libcrc returns
 /// `0x82EA` for `b"123456789"` where the catalogue specifies `0xEA82`.
 pub fn crc_dnp(data: &[u8]) -> u16 {
-    byteswap(!data.iter().fold(START_DNP, |crc, &b| update_crc_dnp(crc, b)))
+    byteswap(
+        !data
+            .iter()
+            .fold(START_DNP, |crc, &b| update_crc_dnp(crc, b)),
+    )
 }
 
 /// CRC-16/SICK. libcrc `crc_sick()`. Check value is `0x56A6`.
@@ -303,20 +310,23 @@ pub fn crc_dnp(data: &[u8]) -> u16 {
 /// itself — correctness rests entirely on byte-for-byte differential parity.
 pub fn crc_sick(data: &[u8]) -> u16 {
     // Carries the previous byte alongside the CRC; `0` for the first byte.
-    let (crc, _) = data
-        .iter()
-        .fold((START_SICK, 0u8), |(crc, prev), &b| (update_crc_sick(crc, b, prev), b));
+    let (crc, _) = data.iter().fold((START_SICK, 0u8), |(crc, prev), &b| {
+        (update_crc_sick(crc, b, prev), b)
+    });
     byteswap(crc)
 }
 
 /// CRC-64/ECMA. libcrc `crc_64_ecma()`.
 pub fn crc_64_ecma(data: &[u8]) -> u64 {
-    data.iter().fold(START_64_ECMA, |crc, &b| update_crc_64(crc, b))
+    data.iter()
+        .fold(START_64_ECMA, |crc, &b| update_crc_64(crc, b))
 }
 
 /// CRC-64/WE. libcrc `crc_64_we()`. Same table as ECMA, different seed and final XOR.
 pub fn crc_64_we(data: &[u8]) -> u64 {
-    data.iter().fold(START_64_WE, |crc, &b| update_crc_64(crc, b)) ^ 0xFFFF_FFFF_FFFF_FFFF
+    data.iter()
+        .fold(START_64_WE, |crc, &b| update_crc_64(crc, b))
+        ^ 0xFFFF_FFFF_FFFF_FFFF
 }
 
 /// NMEA 0183 sentence checksum. libcrc `checksum_NMEA()`.
@@ -379,10 +389,26 @@ mod tests {
     /// divergence explicitly so nobody "fixes" it later and silently fails the suite.
     #[test]
     fn documented_catalogue_divergences_are_preserved() {
-        assert_eq!(crc_kermit(CHECK), 0x8921, "libcrc byte-swaps; catalogue says 0x2189");
-        assert_eq!(byteswap(crc_kermit(CHECK)), 0x2189, "swapping back yields the catalogue value");
-        assert_eq!(crc_dnp(CHECK), 0x82EA, "libcrc byte-swaps; catalogue says 0xEA82");
-        assert_eq!(byteswap(crc_dnp(CHECK)), 0xEA82, "swapping back yields the catalogue value");
+        assert_eq!(
+            crc_kermit(CHECK),
+            0x8921,
+            "libcrc byte-swaps; catalogue says 0x2189"
+        );
+        assert_eq!(
+            byteswap(crc_kermit(CHECK)),
+            0x2189,
+            "swapping back yields the catalogue value"
+        );
+        assert_eq!(
+            crc_dnp(CHECK),
+            0x82EA,
+            "libcrc byte-swaps; catalogue says 0xEA82"
+        );
+        assert_eq!(
+            byteswap(crc_dnp(CHECK)),
+            0xEA82,
+            "swapping back yields the catalogue value"
+        );
     }
 
     /// Feeding bytes one at a time must equal the one-shot result; libcrc exposes both
