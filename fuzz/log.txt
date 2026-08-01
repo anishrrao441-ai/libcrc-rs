@@ -1,0 +1,172 @@
+=========================================================================
+ libcrc differential fuzz run — original C library vs. Rust port
+ Port Mortem 2026 · track C -> Rust · lammertb/libcrc
+=========================================================================
+
+RESULT
+  seed                  0xE86F885A2BCDBFC5  (16748755460077502405)
+  wall-clock duration   75.945 s (continuous, single uninterrupted run)
+  cases executed        1100000
+  cases / second        14484
+  value comparisons     27500000  (25 per case)
+  payload hashed        633.2 MiB per algorithm
+  batches               22  (50000 cases per batch)
+  input stream digest   0x0AC47573333F30C0  (FNV-1a over every case)
+  DIVERGENCES           0
+
+REPLAY (bit-for-bit; case N depends only on the seed and on N)
+  ./fuzz/run.sh --seed 16748755460077502405 --cases 1100000
+
+  Or drive the binary directly, from the repo root:
+    ./fuzz/differential/target/release/difffuzz \
+        --seed 16748755460077502405 --cases 1100000 --batch 50000 --start 0 \
+        --oracle C:/Users/pc/Desktop/portmortem-2026/fuzz/build/oracle_harness.exe --workdir fuzz/build/work --log fuzz/log.txt
+
+  A single case can be re-run on its own:
+    ... --seed 16748755460077502405 --case <INDEX>
+
+  Batch size does not affect the stream: inputs are derived per case as
+  SplitMix64(seed ^ SplitMix64(index)), so any --batch replays the same bytes.
+
+  That is checkable rather than merely asserted. Re-run the seed at a DIFFERENT
+  batch size and the input stream digest above must come out identical:
+    ./fuzz/run.sh --seed 16748755460077502405 --cases 1100000 --batch 7919
+    -> input stream digest must be 0x0AC47573333F30C0
+  This run was time-bounded (--seconds 75); the replay above is case-bounded
+  at the count actually reached, which reproduces it exactly.
+
+HOW THE TWO SIDES ARE COMPARED
+  Shared public API. Both sides are handed identical bytes and asked for all 13
+  exported entry points, plus the same twelve values rebuilt one byte at a time
+  through the 8 update_crc_* functions.
+
+  Oracle   the ORIGINAL C libcrc, built from the pristine upstream tree with the
+           project's own CFLAGS (-O3 -funsigned-char). It lives in the gitignored
+           oracle/ directory and nothing in crates/ links, calls or depends on it.
+  Port     crates/libcrc-rs, called directly as a Rust library. No FFI, no shim,
+           no C in the measured path.
+
+  BATCH, NOT STREAM. Each round writes a whole batch to a file, runs the oracle
+  once with stdin closed, waits for it to exit, then reads the results file. No
+  pipe is ever read, so the Windows anonymous-pipe deadlock that a long-lived
+  bidirectional oracle would risk has no surface here. CRC is a pure function;
+  there is nothing to interleave.
+
+API COVERAGE — 13 one-shot + 12 incremental checks per case
+  crc_8                            1100000 cases
+  crc_16                           1100000 cases
+  crc_32                           1100000 cases
+  crc_64_ecma                      1100000 cases
+  crc_64_we                        1100000 cases
+  crc_ccitt_1d0f                   1100000 cases
+  crc_ccitt_ffff                   1100000 cases
+  crc_dnp                          1100000 cases
+  crc_kermit                       1100000 cases
+  crc_modbus                       1100000 cases
+  crc_sick                         1100000 cases
+  crc_xmodem                       1100000 cases
+  checksum_NMEA                    1100000 cases
+  update_crc_8                     1100000 cases
+  update_crc_16[init=0x0000]       1100000 cases
+  update_crc_16[init=0xFFFF]       1100000 cases
+  update_crc_32                    1100000 cases
+  update_crc_64[ecma]              1100000 cases
+  update_crc_64[we]                1100000 cases
+  update_crc_ccitt[init=0x1D0F]    1100000 cases
+  update_crc_ccitt[init=0xFFFF]    1100000 cases
+  update_crc_ccitt[init=0x0000]    1100000 cases
+  update_crc_dnp                   1100000 cases
+  update_crc_kermit                1100000 cases
+  update_crc_sick                  1100000 cases
+
+  checksum_NMEA has no incremental form in libcrc, hence 12 rather than 13.
+  update_crc_64 is used for both CRC-64 seeds. The header's documented
+  update_crc_64_ecma() cannot be called at all — see UPSTREAM NOTE below.
+
+INPUT MIX
+  fixed-corpus                          719    0.07%
+  empty                               43799    3.98%
+  single-byte                        109561    9.96%
+  boundary-length                    109910    9.99%
+  random-binary-small                330289   30.03%
+  random-binary-medium               164880   14.99%
+  uniform-byte-fill                   88007    8.00%
+  zero-heavy                           4267    0.39%
+  0xFF-heavy                          43798    3.98%
+  sparse                              55135    5.01%
+  nmea-sentence                       88018    8.00%
+  delimiter-rich-ascii                55190    5.02%
+  long-buffer-16KiB..256KiB            1063    0.10%
+  null-pointer                         5364    0.49%
+
+  The 'fixed-corpus' class is a deterministic prologue that runs before any
+  random input, so these are covered on EVERY run rather than probabilistically:
+    - empty input
+    - all 256 byte values as a single byte, and as a 17-byte uniform fill
+    - lengths 1,7,8,9,15,16,17,31,32,33,63,64,65,127,128,129 under four fill
+      patterns (zero, 0xFF, counting, 0x55/0xAA)
+    - all-zero and all-0xFF buffers at 0,1,255,256,257,1023,1024,1025,4095,4096,4097
+    - long buffers: 65535, 65536, 65537 and 262144 bytes, four fill patterns
+    - NMEA sentences, with and without the leading '$', terminated by end-of-string,
+      '*', CR, LF and CRLF, including embedded NULs and delimiters at interior
+      offsets
+    - the NULL-pointer contract at four lengths (libcrc returns the init value from
+      its twelve CRC functions and NULL from checksum_NMEA)
+
+ORACLE SELF-CHECK (run before the clock started)
+  The oracle is asked for "123456789" and its answers are compared against the
+  values recorded from the upstream library in 00-VERIFIED-FACTS.md §11. If the
+  oracle were mis-built — most likely by dropping -funsigned-char, which libcrc
+  requires — it would be wrong itself and every 'divergence' below would be an
+  artefact. Result: PASS
+
+DIVERGENCES
+  None. 1100000 cases x 25 value comparisons = 27500000 comparisons, all identical.
+
+  Stated precisely, because the distinction matters: this is byte-for-byte
+  agreement on every input the generator produced. It is evidence, not proof.
+  crc_sick in particular has no external reference implementation — libcrc is
+  its only definition — so its correctness argument rests entirely on this
+  differential parity.
+
+UPSTREAM NOTE — a public API that cannot be called
+  Building this harness surfaced it mechanically. include/checksum.h:99 declares
+
+      uint64_t update_crc_64_ecma( uint64_t crc, unsigned char c );
+
+  and no definition exists anywhere in src/. `nm lib/libcrc.a | grep update_crc_64`
+  reports exactly one symbol, `update_crc_64`, which the public header does NOT
+  declare. So the documented incremental CRC-64 entry point fails to link, and the
+  one that works is undocumented. fuzz/oracle_harness.c has to declare
+  `update_crc_64` itself to reach it — that extern is the evidence. Reproduce with
+  fuzz/prove_d01.sh.
+
+WHAT THIS RUN DOES *NOT* SHOW
+  - It compares crates/libcrc-rs directly. The C-ABI shim in crates/libcrc-cabi is
+    covered separately, by the unmodified original test suite linking against it.
+    The NULL-pointer cases here do exercise the shim's NULL->empty-slice mapping
+    as a model, but not the shim's own pointer arithmetic.
+  - Inputs are generated, not coverage-guided. cargo-fuzz needs a nightly
+    toolchain and this machine has none, so there is no libFuzzer feedback loop
+    steering toward new edges. The mitigation is the fixed corpus above, which
+    pins the structural edge cases rather than hoping to stumble on them.
+  - Single platform: x86-64 windows-gnu. libcrc's lazy table initialisation is
+    unsynchronised, which is undefined behaviour under C11 5.1.2.4 and can go
+    wrong on a weakly ordered CPU; x86 is TSO and will not show it. The port has
+    no runtime initialisation at all, so it cannot exhibit the bug either way.
+  - Single-threaded. Concurrency is a separate exercise, not this one.
+
+ENVIRONMENT
+  rustc                 rustc 1.96.0 (ac68faa20 2026-05-25)
+  cargo                 cargo 1.96.0 (30a34c682 2026-05-25)
+  gcc (oracle)          gcc (Rev5, Built by MSYS2 project) 16.1.0
+  host                  windows
+  arch                  x86_64
+
+  Oracle build:  mingw32-make OS=posix CC=gcc EXEEXT=.exe
+  Oracle CFLAGS: -O3 -funsigned-char (libcrc's own; -funsigned-char is
+                 mandatory — gcc on x86 defaults to signed char, which
+                 would make the oracle itself wrong)
+  Harness build: gcc -Wall -Wextra -Werror -O2 -funsigned-char
+
+=========================================================================
