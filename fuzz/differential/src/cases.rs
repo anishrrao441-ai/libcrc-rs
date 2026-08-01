@@ -130,6 +130,16 @@ impl Batch {
 struct BatchWriter {
     blob: Vec<u8>,
     spans: Vec<Span>,
+    /// Generators build into this, never into `blob`.
+    ///
+    /// The first version let them append straight to `blob` to save a memcpy. That put a
+    /// generator one arithmetic slip away from writing *behind* its own payload: some
+    /// classes poke a byte at a random offset, and an offset taken against the whole blob
+    /// instead of the current payload silently overwrote an earlier case's length field.
+    /// The batch then failed to parse thousands of cases later, nowhere near the cause.
+    /// Handing generators a buffer that starts at zero and contains nothing else makes
+    /// that class of bug unrepresentable; the memcpy is noise next to a process spawn.
+    scratch: Vec<u8>,
 }
 
 impl BatchWriter {
@@ -138,6 +148,7 @@ impl BatchWriter {
             // 12-byte header, then ~5 bytes of framing plus a typical payload per case.
             blob: Vec::with_capacity(12 + cases * 160),
             spans: Vec::with_capacity(cases),
+            scratch: Vec::with_capacity(262_144),
         }
     }
 
@@ -147,21 +158,19 @@ impl BatchWriter {
         self.blob.extend_from_slice(&0u32.to_le_bytes()); // patched by finish()
     }
 
-    /// Append a case, generating its payload straight into the blob so a batch of 50 000
-    /// inputs costs zero per-case allocations.
     fn push<F>(&mut self, index: u64, class: Class, is_null: bool, write_payload: F)
     where
         F: FnOnce(&mut Vec<u8>),
     {
+        self.scratch.clear();
+        write_payload(&mut self.scratch);
+
+        let len = self.scratch.len();
         self.blob.push(u8::from(is_null));
-        let len_at = self.blob.len();
-        self.blob.extend_from_slice(&0u32.to_le_bytes()); // patched below
+        self.blob.extend_from_slice(&(len as u32).to_le_bytes());
         let offset = self.blob.len();
+        self.blob.extend_from_slice(&self.scratch);
 
-        write_payload(&mut self.blob);
-
-        let len = self.blob.len() - offset;
-        self.blob[len_at..len_at + 4].copy_from_slice(&(len as u32).to_le_bytes());
         self.spans.push(Span { index, offset, len, is_null, class });
     }
 
@@ -425,6 +434,9 @@ fn write_random_class(out: &mut Vec<u8>, class: Class, rng: &mut Rng) {
 /// fields, and — often but not always — a `*` checksum suffix and a CR/LF terminator.
 /// Sometimes a stray NUL or delimiter is injected mid-sentence.
 fn write_nmea(out: &mut Vec<u8>, rng: &mut Rng) {
+    // Every index below is taken relative to `at`, never to the raw buffer length.
+    let at = out.len();
+
     if rng.below(4) != 0 {
         out.push(b'$');
     }
@@ -450,8 +462,8 @@ fn write_nmea(out: &mut Vec<u8>, rng: &mut Rng) {
 
     // Inject a terminator character somewhere in the middle now and then, so the early
     // exits are hit at an interior offset rather than only at the end.
-    if rng.below(8) == 0 && !out.is_empty() {
-        let pos = rng.below(out.len() as u32) as usize;
+    if rng.below(8) == 0 && out.len() > at {
+        let pos = at + rng.below((out.len() - at) as u32) as usize;
         out[pos] = match rng.below(4) {
             0 => 0x00,
             1 => b'\r',
@@ -532,21 +544,68 @@ mod tests {
         }
     }
 
+    /// Walk the blob exactly the way the C harness does, and confirm every framed length
+    /// still matches the span recorded at generation time.
+    ///
+    /// Regression test. The first version of `BatchWriter` let generators append directly
+    /// to the batch blob, and `write_nmea` picked its "inject a delimiter mid-sentence"
+    /// offset against the whole blob rather than its own payload — so it could overwrite
+    /// a *previous* case's 4-byte length field. The oracle then rejected the batch with
+    /// "truncated payload for case 159" 10 000 cases into a run, pointing nowhere near
+    /// the generator that did it. The ranges below are chosen to include NMEA cases.
     #[test]
-    fn wire_format_round_trips_lengths() {
+    fn wire_format_parses_end_to_end() {
         let fixed = prologue();
-        let batch = build_batch(&fixed, 1, 0, 64);
-        assert_eq!(&batch.blob[0..4], &MAGIC_CASES);
-        assert_eq!(u32::from_le_bytes(batch.blob[8..12].try_into().unwrap()), 64);
+        for (start, count) in [(0u64, 800usize), (5_000, 5_000), (10_000, 5_000)] {
+            let batch = build_batch(&fixed, 0x1234, start, count);
+            assert_eq!(&batch.blob[0..4], &MAGIC_CASES);
+            assert_eq!(
+                u32::from_le_bytes(batch.blob[4..8].try_into().unwrap()),
+                FORMAT_VERSION
+            );
+            assert_eq!(
+                u32::from_le_bytes(batch.blob[8..12].try_into().unwrap()) as usize,
+                count
+            );
 
-        let mut pos = 12usize;
-        for span in &batch.spans {
-            let len = u32::from_le_bytes(batch.blob[pos + 1..pos + 5].try_into().unwrap());
-            assert_eq!(len as usize, span.len);
-            assert_eq!(pos + 5, span.offset);
-            pos += 5 + span.len;
+            let mut pos = 12usize;
+            for (i, span) in batch.spans.iter().enumerate() {
+                assert!(pos + 5 <= batch.blob.len(), "header of case {i} runs off the end");
+                let framed = u32::from_le_bytes(batch.blob[pos + 1..pos + 5].try_into().unwrap());
+                assert_eq!(
+                    framed as usize, span.len,
+                    "case {i} (index {}) framed length {framed} != span length {}",
+                    span.index, span.len
+                );
+                assert_eq!(batch.blob[pos] & 0x01 != 0, span.is_null, "case {i} null flag");
+                assert_eq!(pos + 5, span.offset, "case {i} payload offset");
+                pos += 5 + span.len;
+                assert!(pos <= batch.blob.len(), "payload of case {i} runs off the end");
+            }
+            assert_eq!(pos, batch.blob.len(), "trailing bytes after the last case");
         }
-        assert_eq!(pos, batch.blob.len());
+    }
+
+    /// A generator must never touch anything outside the buffer it was handed.
+    #[test]
+    fn generators_only_append_to_their_own_payload() {
+        for index in 0..20_000u64 {
+            let mut rng = Rng::for_case(0xABCD_EF01, index);
+            let class = pick_class(&mut rng);
+            if class == Class::Prologue {
+                continue;
+            }
+            // A canary prefix standing in for previously written cases.
+            const CANARY: &[u8] = b"\xDE\xAD\xBE\xEF-do-not-touch-me-0123456789";
+            let mut buf = CANARY.to_vec();
+            write_random_class(&mut buf, class, &mut rng);
+            assert_eq!(
+                &buf[..CANARY.len()],
+                CANARY,
+                "class {:?} at index {index} wrote behind its own payload",
+                class
+            );
+        }
     }
 
     #[test]
