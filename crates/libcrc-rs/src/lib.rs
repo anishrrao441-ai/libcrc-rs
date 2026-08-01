@@ -34,7 +34,11 @@ mod combine;
 mod digest;
 mod tables;
 
-pub use combine::crc_32_combine;
+pub use combine::{
+    crc_16_combine, crc_32_combine, crc_64_ecma_combine, crc_64_we_combine, crc_8_combine,
+    crc_ccitt_1d0f_combine, crc_ccitt_ffff_combine, crc_dnp_combine, crc_kermit_combine,
+    crc_modbus_combine, crc_xmodem_combine,
+};
 pub use digest::{Crc16Digest, Crc32Digest, Crc32Hasher, Crc64Digest};
 
 use tables::SHT75_CRC_TABLE;
