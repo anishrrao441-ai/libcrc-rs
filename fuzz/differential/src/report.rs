@@ -23,13 +23,35 @@ pub struct RunConfig {
     pub oracle_exe: String,
 }
 
-#[derive(Default)]
+const FNV_OFFSET: u64 = 0xCBF2_9CE4_8422_2325;
+const FNV_PRIME: u64 = 0x0000_0100_0000_01B3;
+
 pub struct Stats {
     pub cases: u64,
     pub payload_bytes: u64,
     pub batches: u64,
     pub class_counts: [u64; Class::ALL.len()],
     pub divergences: u64,
+    /// FNV-1a over every case the run actually fed to both sides.
+    ///
+    /// This turns "reproducible from the recorded seed" from a claim into something a
+    /// reader can check: replay the seed at a *different* `--batch` and the digest must
+    /// come out identical. FNV rather than one of the CRCs under test, so the check does
+    /// not depend on the thing being tested.
+    pub stream_digest: u64,
+}
+
+impl Default for Stats {
+    fn default() -> Self {
+        Stats {
+            cases: 0,
+            payload_bytes: 0,
+            batches: 0,
+            class_counts: [0; Class::ALL.len()],
+            divergences: 0,
+            stream_digest: FNV_OFFSET,
+        }
+    }
 }
 
 impl Stats {
@@ -37,6 +59,24 @@ impl Stats {
         if let Some(slot) = Class::ALL.iter().position(|&c| c == class) {
             self.class_counts[slot] += 1;
         }
+    }
+
+    /// Fold one case into the stream digest: its index, its NULL flag, the length handed
+    /// to the C API, and the bytes the port saw.
+    pub fn mix(&mut self, index: u64, is_null: bool, wire_len: usize, payload: &[u8]) {
+        let mut h = self.stream_digest;
+        let mut fold = |byte: u8| h = (h ^ byte as u64).wrapping_mul(FNV_PRIME);
+        for b in index.to_le_bytes() {
+            fold(b);
+        }
+        fold(u8::from(is_null));
+        for b in (wire_len as u64).to_le_bytes() {
+            fold(b);
+        }
+        for &b in payload {
+            fold(b);
+        }
+        self.stream_digest = h;
     }
 
     /// 13 one-shot values plus 12 incremental values are compared per case.
@@ -137,6 +177,7 @@ pub fn render(
     let _ = writeln!(w, "  value comparisons     {}  (25 per case)", stats.value_comparisons());
     let _ = writeln!(w, "  payload hashed        {mib:.1} MiB per algorithm");
     let _ = writeln!(w, "  batches               {}  ({} cases per batch)", stats.batches, cfg.batch_size);
+    let _ = writeln!(w, "  input stream digest   0x{:016X}  (FNV-1a over every case)", stats.stream_digest);
     let _ = writeln!(w, "  DIVERGENCES           {}", stats.divergences);
     let _ = writeln!(w);
 
@@ -159,7 +200,13 @@ pub fn render(
     let _ = writeln!(
         w,
         "  Batch size does not affect the stream: inputs are derived per case as\n\
-         \x20 SplitMix64(seed ^ SplitMix64(index)), so any --batch replays the same bytes."
+         \x20 SplitMix64(seed ^ SplitMix64(index)), so any --batch replays the same bytes.\n\
+         \n\
+         \x20 That is checkable rather than merely asserted. Re-run the seed at a DIFFERENT\n\
+         \x20 batch size and the input stream digest above must come out identical:\n\
+         \x20   ./fuzz/run.sh --seed {} --cases {} --batch 7919\n\
+         \x20   -> input stream digest must be 0x{:016X}",
+        cfg.seed, stats.cases, stats.stream_digest
     );
     if cfg.requested_cases.is_none() {
         let _ = writeln!(

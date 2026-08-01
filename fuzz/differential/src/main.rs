@@ -400,6 +400,7 @@ fn run() -> Result<i32, String> {
             let payload = batch.payload(span);
             stats.record_class(span.class);
             stats.payload_bytes += payload.len() as u64;
+            stats.mix(span.index, span.is_null, span.len, payload);
 
             let diffs = compare(payload, span.is_null, &results.oneshot(i), &results.incremental(i));
             if diffs.is_empty() {
@@ -470,6 +471,7 @@ fn run() -> Result<i32, String> {
     println!("  duration      {:.3} s", elapsed.as_secs_f64());
     println!("  cases         {}", stats.cases);
     println!("  comparisons   {}", stats.value_comparisons());
+    println!("  stream digest 0x{:016X}", stats.stream_digest);
     println!("  divergences   {}", stats.divergences);
     println!("  log           {}", args.log.display());
     println!("---------------------------------------------------------------");
