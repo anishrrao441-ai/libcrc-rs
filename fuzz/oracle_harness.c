@@ -90,6 +90,30 @@ extern uint64_t update_crc_64( uint64_t crc, unsigned char c );
 #define BLOCK_BYTES  40u
 #define RECORD_BYTES (2u * BLOCK_BYTES)
 
+#ifdef PM_SABOTAGE
+/*
+ * ===========================================================================
+ * NEGATIVE CONTROL — compiled in ONLY with -DPM_SABOTAGE, never for a real run.
+ * ===========================================================================
+ *
+ * A fuzzer that reports "zero divergences" is worthless until you have watched it
+ * report a non-zero one. This deliberately corrupts a single algorithm, for inputs
+ * containing a single trigger byte, so a run against this build MUST fail and MUST
+ * shrink the input down to that one byte. See fuzz/negative-control.sh.
+ *
+ * The build announces itself on stderr so this binary can never be mistaken for the
+ * real oracle.
+ */
+static int sabotage_trigger( const unsigned char *data, size_t len ) {
+
+	size_t i;
+
+	if ( data == NULL ) return 0;
+	for ( i = 0; i < len; i++ ) if ( data[i] == 0x7Au ) return 1;
+	return 0;
+}
+#endif
+
 /* ------------------------------------------------------------------ little-endian */
 
 static void put_u8( unsigned char *p, uint8_t v ) {
@@ -132,13 +156,20 @@ static void compute_oneshot( unsigned char *out, const unsigned char *data, size
 	put_u16( out +  6, crc_ccitt_1d0f( data, len ) );
 	put_u16( out +  8, crc_ccitt_ffff( data, len ) );
 	put_u16( out + 10, crc_dnp       ( data, len ) );
-	put_u16( out + 12, crc_kermit    ( data, len ) );
 	put_u16( out + 14, crc_modbus    ( data, len ) );
 	put_u16( out + 16, crc_sick      ( data, len ) );
 	put_u16( out + 18, crc_xmodem    ( data, len ) );
 	put_u32( out + 20, crc_32        ( data, len ) );
 	put_u64( out + 24, crc_64_ecma   ( data, len ) );
 	put_u64( out + 32, crc_64_we     ( data, len ) );
+
+	{
+		uint16_t kermit = crc_kermit( data, len );
+#ifdef PM_SABOTAGE
+		if ( sabotage_trigger( data, len ) ) kermit = (uint16_t) ( kermit ^ 0x0001u );
+#endif
+		put_u16( out + 12, kermit );
+	}
 
 	/*
 	 * checksum_NMEA is delimiter driven, not length driven: it walks a NUL-terminated
@@ -273,6 +304,13 @@ int main( int argc, char *argv[] ) {
 		fprintf( stderr, "usage: %s <cases.bin> <results.bin>\n", argv[0] );
 		return 2;
 	}
+
+#ifdef PM_SABOTAGE
+	fprintf( stderr,
+	         "*** SABOTAGED ORACLE — crc_kermit is deliberately corrupted for inputs\n"
+	         "*** containing byte 0x7A. This build exists only to prove the fuzzer can\n"
+	         "*** detect and minimise a divergence. Never use it for a real run.\n" );
+#endif
 
 	cases = read_whole_file( argv[1], &cases_len );
 	if ( cases == NULL ) {
