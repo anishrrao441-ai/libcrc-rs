@@ -3,3 +3,6 @@ target/
 *.exe
 *.o
 *.a
+build/
+fuzz/build/
+bench/raw/*.tmp
