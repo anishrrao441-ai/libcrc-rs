@@ -52,6 +52,17 @@ behaviour **including its divergences**, and pins them with a regression test
 (`documented_catalogue_divergences_are_preserved`) so nobody later "fixes" them and
 silently breaks compatibility.
 
+**This is not a theoretical concern.** [libcrc issue #25](https://github.com/lammertb/libcrc/issues/25)
+— open since December 2024 — is a user reporting exactly this, with exactly these values:
+
+> I am using your lib and I got found different values for CRC-16 CRC-CCITT (Kermit) algorithm.
+> On your calculation site … for the value 123456789 I got **0x8921**. In other way at site
+> (crccalc.com) for same value and algorithm got **0x2189**. Is there any way to get the same value?
+
+A port that "corrected" Kermit to `0x2189` would look right to that user and be wrong for every
+existing libcrc deployment. We chose compatibility, and documented the choice
+([`DECISIONS.md` D-3](DECISIONS.md)).
+
 `crc_sick` has no external reference implementation whatsoever — libcrc is its only
 specification — so its correctness rests entirely on byte-for-byte differential parity with
 the original. We say so rather than implying a standard was followed.
