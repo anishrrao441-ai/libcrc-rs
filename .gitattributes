@@ -1,0 +1,19 @@
+# Normalise line endings in the repository by default.
+* text=auto
+
+# Shell scripts must keep LF or they will not execute on POSIX systems.
+*.sh text eol=lf
+
+# ── DO NOT TOUCH THESE ───────────────────────────────────────────────────────
+# The vendored original test suite is hashed at import and must be byte-identical
+# on every platform. If git converts its line endings on checkout, the SHA-256
+# values change and the tamper check fails — which looks exactly like we edited
+# the tests. Marking them binary (-text) disables all conversion.
+#
+# The manifest itself must also stay LF: `sha256sum -c` parses filenames to the
+# end of line, so a trailing CR makes every path unreadable.
+tests/original/**    -text
+tests/original.sha256 -text
+
+# The parity digests are compared byte-for-byte against C program output.
+tests/parity/expected_digests.txt -text

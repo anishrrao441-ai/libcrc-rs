@@ -23,8 +23,15 @@ ok "cargo $(cargo --version | cut -d' ' -f2), $(${CC:-gcc} --version | head -1)"
 # Checked BEFORE building so a tampered suite can never produce a green run.
 step "Verifying the original test suite is unmodified"
 if command -v sha256sum >/dev/null; then
-    sha256sum -c tests/original.sha256 >/dev/null || fail "tests/original/ has been MODIFIED — refusing to build"
-    ok "$(wc -l < tests/original.sha256) files match tests/original.sha256"
+    # Strip any CR the checkout may have introduced. This affects only how the
+    # manifest is PARSED — every hash is still verified against the real file.
+    # Without it, `sha256sum -c` reads filenames with a trailing CR and reports
+    # every file missing, which is indistinguishable from tampering.
+    MANIFEST=$(mktemp); trap 'rm -f "$MANIFEST"' EXIT
+    tr -d '\r' < tests/original.sha256 > "$MANIFEST"
+    sha256sum -c "$MANIFEST" >/dev/null \
+        || fail "tests/original/ has been MODIFIED — refusing to build"
+    ok "$(grep -c . "$MANIFEST") files match tests/original.sha256"
 else
     printf '  sha256sum unavailable; skipping hash verification\n'
 fi
