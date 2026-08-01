@@ -8,26 +8,33 @@
 #
 # ─── PLATFORM VERIFICATION STATUS ────────────────────────────────────────────────────
 #
-#   VERIFIED (actually run, repeatedly, including from a fresh `git clone`):
+#   VERIFIED LOCALLY, by the author, repeatedly, including from a fresh `git clone`:
 #       Windows 10 + MSYS2/UCRT64 · gcc 16.1.0 · rustc 1.96.0 x86_64-pc-windows-gnu
-#       This is the only platform the author had. Exit status 0.
+#       This is the only machine the author had.
 #
-#   BEST-EFFORT UNTIL CI RUNS (never executed by the author — no Linux or macOS machine
-#   was available; do not read anything in this repo as a claim that they passed):
-#       ubuntu-latest, macos-latest. Their first real evidence is
-#       .github/workflows/ci.yml. Until that workflow is green, "builds on Linux/macOS"
-#       is an expectation, not a result.
+#   VERIFIED IN GITHUB ACTIONS — run 30708995871, 2026-08-01T16:49Z, commit dea7266:
+#       ubuntu-latest  x86_64-unknown-linux-gnu, gcc 13.3.0     "BUILD OK"
+#       macos-latest   aarch64-apple-darwin, Apple clang 21.0.0 "BUILD OK"
+#       docker         rust:1.96.0-slim-bookworm image built, and the container printed
+#                      "**** All tests succeeded"
+#       windows-latest FAILED — correctly. The runner's default Rust is MSVC, which emits
+#                      crc.lib; the guard below caught it and printed the fix instead of a
+#                      wall of undefined symbols. CI now pins the GNU toolchain there.
 #
-#   What was done to make those two platforms likely to work first try:
+#   STILL UNVERIFIED ANYWHERE: every other platform. musl, BSD, 32-bit, big-endian and
+#   cross-compilation are untested. Nothing in this repo claims otherwise.
+#
+#   The portability measures that carried Linux and macOS:
 #     * the native libraries needed to link a Rust staticlib are asked of the target
-#       itself (`rustc --print native-static-libs`) instead of hand-guessed per OS; the
-#       per-OS table is now only a fallback for when that probe cannot run
-#     * sha256sum OR shasum -a 256 OR gsha256sum — macOS ships no `sha256sum`
+#       itself (`rustc --print native-static-libs`); the per-OS table is a fallback.
+#       Read the comment at step 5 — the probe failed silently on its first CI run and
+#       ONLY the fallback saved it. Both paths have now been exercised for real.
+#     * sha256sum OR gsha256sum OR shasum -a 256 — macOS ships no `sha256sum` by default
+#       (the GitHub runner happens to have one; a judge's laptop will not)
 #     * no bare `mktemp`: BSD/macOS mktemp requires a template, GNU does not
-#     * every exit status is checked directly; nothing that can fail is run through a
-#       pipe, where its status could be swallowed
-#     * an MSVC-vs-MinGW toolchain mismatch is detected and explained, instead of
-#       surfacing as a wall of undefined symbols from the linker
+#     * every exit status is checked directly; nothing that can fail runs through a pipe,
+#       where its status could be swallowed
+#     * an MSVC-vs-MinGW toolchain mismatch is detected and explained
 #     * `.exe` suffixing on Windows is handled explicitly rather than relied upon
 #
 # ──────────────────────────────────────────────────────────────────────────────────────
@@ -154,10 +161,24 @@ ok "compiled $NOBJ translation units, unmodified"
 # on glibc, nothing extra on musl). Ask the compiler that produced the archive rather
 # than maintaining a guess: `--print native-static-libs` prints exactly what this
 # target needs, in an order the platform linker accepts.
+#
+# Two things defeated this probe on its first CI run (30708995871) — on BOTH Linux and
+# macOS it printed nothing and only the fallback table below kept the build alive:
+#   * dtolnay/rust-toolchain exports CARGO_TERM_COLOR=always, so rustc's note arrives
+#     wrapped in ANSI escapes and a `^note: ` anchored match never fires;
+#   * cargo does not re-run rustc for a unit it considers fresh, and prints nothing at
+#     all in that case.
+# Hence: colour forced off, escapes stripped anyway, match unanchored, and the probe
+# compiles into a scratch target directory that is removed first so it cannot be fresh.
 step "Determining the native libraries this target needs"
 SYSLIBS=""
-NATIVE=$(cargo rustc -p libcrc-cabi --release --quiet -- --print native-static-libs 2>&1 \
-         | tr -d '\r' | sed -n 's/^note: native-static-libs: *//p' | tail -n 1) || NATIVE=""
+ESC=$(printf '\033')
+PROBE_DIR="$BUILD_DIR/nativelibs-probe"
+rm -rf "$PROBE_DIR"
+NATIVE=$(CARGO_TERM_COLOR=never CARGO_TARGET_DIR="$PROBE_DIR" \
+         cargo rustc -p libcrc-cabi --release --quiet -- --print native-static-libs 2>&1 \
+         | tr -d '\r' | sed "s/${ESC}\[[0-9;]*[A-Za-z]//g" \
+         | sed -n 's/.*native-static-libs: *//p' | tail -n 1) || NATIVE=""
 if [ -n "$NATIVE" ]; then
     SYSLIBS="$NATIVE"
     ok "rustc reports: $SYSLIBS"
@@ -185,10 +206,18 @@ if [ ! -f "$TESTBIN" ]; then fail "linker reported success but produced no $TEST
 ok "$TESTBIN — nothing from the original C library is linked"
 
 # --- 6. the moment of truth -----------------------------------------------------
+# testall.c returns the NUMBER of failures (`return problems;`), so a hypothetical 256
+# failures would exit 0. The status is therefore checked AND the success banner the
+# original program prints is required to be present.
 step "Running the ORIGINAL test suite against the Rust port"
-if "./$TESTBIN"; then
+SUITE_OUT="$BUILD_DIR/testall.out"
+if "./$TESTBIN" >"$SUITE_OUT" 2>&1; then
+    cat "$SUITE_OUT"
+    grep -qF '**** All tests succeeded' "$SUITE_OUT" \
+        || fail "original suite exited 0 but did not print its success banner"
     ok "original suite passed"
 else
+    cat "$SUITE_OUT" >&2
     fail "original suite FAILED"
 fi
 
