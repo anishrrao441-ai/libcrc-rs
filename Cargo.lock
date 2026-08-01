@@ -10,5 +10,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "libcrc-cli"
+version = "0.1.0"
+dependencies = [
+ "libcrc-rs",
+]
+
+[[package]]
 name = "libcrc-rs"
 version = "0.1.0"

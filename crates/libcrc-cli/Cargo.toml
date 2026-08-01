@@ -1,0 +1,17 @@
+[package]
+name = "libcrc-cli"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "`crc` — a dependency-free command-line checksum tool built on the libcrc Rust port"
+
+# The deliverable a judge can run. `cargo build --release` puts it at
+# target/release/crc (crc.exe on Windows).
+[[bin]]
+name = "crc"
+path = "src/main.rs"
+
+[dependencies]
+# The only dependency in the entire workspace, and it is a path dependency on the
+# port itself. Nothing is fetched from crates.io — see the workspace Cargo.lock.
+libcrc-rs = { path = "../libcrc-rs" }

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/libcrc-rs", "crates/libcrc-cabi"]
+members = ["crates/libcrc-rs", "crates/libcrc-cabi", "crates/libcrc-cli"]
 
 [profile.release]
 opt-level = 3
