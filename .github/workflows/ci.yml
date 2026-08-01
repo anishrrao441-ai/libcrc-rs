@@ -36,25 +36,17 @@ jobs:
   build-and-verify:
     name: Original suite vs Rust port (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             toolchain: "1.96.0"
-            shell: bash
           - os: macos-latest
             toolchain: "1.96.0"
-            shell: bash
-          # Windows needs the GNU toolchain, not the default MSVC one: build.sh links the
-          # original C tests with gcc, and an MSVC `crc.lib` cannot be linked by a MinGW
-          # driver (different CRT, different exception personality). This mirrors the
-          # locally verified setup exactly — rustc 1.96.0 x86_64-pc-windows-gnu plus an
-          # MSYS2 UCRT64 gcc. build.sh detects and explains the mismatch if this is ever
-          # changed back.
-          - os: windows-latest
-            toolchain: "1.96.0-x86_64-pc-windows-gnu"
-            shell: "msys2 {0}"
 
     steps:
       - uses: actions/checkout@v4
@@ -64,20 +56,8 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           components: clippy, rustfmt
 
-      # Supplies the mingw-w64 gcc that the original C tests are compiled with. The
-      # Windows images do ship a gcc or two, but which one is on PATH is not something
-      # this repo should depend on. `path-type: inherit` keeps ~/.cargo/bin visible.
-      - name: Set up MSYS2 (Windows only)
-        if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: false
-          path-type: inherit
-          install: mingw-w64-ucrt-x86_64-gcc
 
       - name: Toolchain report
-        shell: ${{ matrix.shell }}
         run: |
           set -eu
           uname -a || true
@@ -90,7 +70,6 @@ jobs:
       # check before it builds anything. macOS has no `sha256sum` — the previous version
       # of this step assumed it did.
       - name: Verify tests/original is unmodified
-        shell: ${{ matrix.shell }}
         run: |
           set -eu
           if   command -v sha256sum  >/dev/null 2>&1; then sha256sum -c tests/original.sha256
@@ -100,11 +79,9 @@ jobs:
           fi
 
       - name: One-command build + original suite
-        shell: ${{ matrix.shell }}
         run: ./build.sh
 
       - name: Prove the port itself contains no unsafe
-        shell: ${{ matrix.shell }}
         run: |
           set -eu
           # `unsafe` is a keyword only in these syntactic positions. Matching the bare
@@ -125,11 +102,9 @@ jobs:
           echo "libcrc-cabi (C ABI test harness): ${harness} unsafe block(s), each justified in UNSAFE.md"
 
       - name: Clippy (warnings are errors)
-        shell: ${{ matrix.shell }}
         run: cargo clippy --all-targets -- -D warnings
 
       - name: Formatting
-        shell: ${{ matrix.shell }}
         run: cargo fmt --all -- --check
 
   docker:
