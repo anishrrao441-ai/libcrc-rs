@@ -69,6 +69,75 @@ c_export!(/// libcrc `crc_64_ecma()`.
 c_export!(/// libcrc `crc_64_we()`.
     crc_64_we -> u64);
 
+// ---------------------------------------------------------------------------
+// The incremental (`update_crc_*`) family.
+//
+// The original test suite never calls these, so passing the suite does NOT prove
+// they exist. They are nonetheless part of libcrc's public header, and a program
+// that calls one and links against a staticlib lacking it fails at link time.
+// A port that omitted them would not be a drop-in replacement.
+// ---------------------------------------------------------------------------
+
+/// libcrc `update_crc_8()`.
+#[no_mangle]
+pub extern "C" fn update_crc_8(crc: u8, c: u8) -> u8 {
+    libcrc_rs::update_crc_8(crc, c)
+}
+
+/// libcrc `update_crc_16()`. Also serves MODBUS, which shares the table.
+#[no_mangle]
+pub extern "C" fn update_crc_16(crc: u16, c: u8) -> u16 {
+    libcrc_rs::update_crc_16(crc, c)
+}
+
+/// libcrc `update_crc_32()`. Operates on the internal, non-finalised value: the
+/// caller applies the final XOR, exactly as in the original.
+#[no_mangle]
+pub extern "C" fn update_crc_32(crc: u32, c: u8) -> u32 {
+    libcrc_rs::update_crc_32(crc, c)
+}
+
+/// libcrc `update_crc_ccitt()`.
+#[no_mangle]
+pub extern "C" fn update_crc_ccitt(crc: u16, c: u8) -> u16 {
+    libcrc_rs::update_crc_ccitt(crc, c)
+}
+
+/// libcrc `update_crc_kermit()`. Returns the un-swapped running value; the caller
+/// byte-swaps at the end, as `crc_kermit()` does.
+#[no_mangle]
+pub extern "C" fn update_crc_kermit(crc: u16, c: u8) -> u16 {
+    libcrc_rs::update_crc_kermit(crc, c)
+}
+
+/// libcrc `update_crc_dnp()`. Returns the running value before complement and swap.
+#[no_mangle]
+pub extern "C" fn update_crc_dnp(crc: u16, c: u8) -> u16 {
+    libcrc_rs::update_crc_dnp(crc, c)
+}
+
+/// libcrc `update_crc_sick()`. Bitwise, and needs the previous byte (`0` for the
+/// first byte of a message).
+#[no_mangle]
+pub extern "C" fn update_crc_sick(crc: u16, c: u8, prev_byte: u8) -> u16 {
+    libcrc_rs::update_crc_sick(crc, c, prev_byte)
+}
+
+/// libcrc `update_crc_64_ecma()` — **deliberately fixes an upstream defect.**
+///
+/// This symbol is declared in the original's public header (`include/checksum.h:99`)
+/// but is **defined nowhere**: `nm` on a freshly built `libcrc.a` reports zero
+/// definitions, so any program that calls the documented API fails to link. Only the
+/// unprefixed `update_crc_64` exists, and it is not declared in the header at all.
+///
+/// Implementing it cannot break behavioural equivalence — you cannot diverge from a
+/// function that does not exist — and it makes the shipped header honest. Reported
+/// upstream; see `DECISIONS.md`.
+#[no_mangle]
+pub extern "C" fn update_crc_64_ecma(crc: u64, c: u8) -> u64 {
+    libcrc_rs::update_crc_64(crc, c)
+}
+
 /// libcrc `checksum_NMEA()`.
 ///
 /// Takes a NUL-terminated sentence and writes two uppercase hex digits plus a NUL

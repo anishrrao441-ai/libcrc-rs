@@ -1,0 +1,8 @@
+update_crc_8 F0A723E1ECEB1F80
+update_crc_16 7A5481A9CA95CE94
+update_crc_ccitt 9C4D9C880374B29A
+update_crc_kermit 4B76E04E103DFBDC
+update_crc_dnp EBCFE4BAC979647A
+update_crc_sick F5490E50A0A0679A
+update_crc_32 FF4C9EFB2DAE270B
+update_crc_64 1F5692D71B2699AF
