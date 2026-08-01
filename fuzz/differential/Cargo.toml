@@ -1,0 +1,27 @@
+[package]
+name = "libcrc-difffuzz"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Differential fuzzer: the original C libcrc against the Rust port, on the shared public API."
+
+# Deliberately a STANDALONE workspace rather than a member of the port's workspace.
+#
+# The port is `cargo build --release` at the repo root and must stay that way: the fuzzer
+# is test tooling, it is the only thing that knows the gitignored C oracle exists, and it
+# must never end up in the port's build graph or its dependency tree. Declaring an empty
+# [workspace] here is what keeps `cargo build` at the root from ever seeing this crate.
+[workspace]
+
+[dependencies]
+libcrc-rs = { path = "../../crates/libcrc-rs" }
+
+[[bin]]
+name = "difffuzz"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

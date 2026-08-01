@@ -1,0 +1,3 @@
+#M qpc_hz 10000000
+#M min_nonzero_delta_ticks 1
+#M min_nonzero_delta_ns 100.0

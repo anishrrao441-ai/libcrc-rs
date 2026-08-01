@@ -1,0 +1,28 @@
+[package]
+name = "bench-rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Benchmark driver for the libcrc Rust port. A measurement instrument, not part of the port."
+
+# Deliberately its OWN workspace root. The port's workspace at the repository
+# root lists exactly two members (crates/libcrc-rs, crates/libcrc-cabi) and this
+# crate is not one of them: `cargo build --release` at the root must build the
+# port and nothing else. Declaring an empty [workspace] here keeps that true
+# without editing the root manifest.
+[workspace]
+
+[[bin]]
+name = "bench_rs"
+path = "src/main.rs"
+
+[dependencies]
+libcrc-rs = { path = "../../crates/libcrc-rs" }
+
+# Mirrors the port's own [profile.release] byte for byte, so the Rust numbers
+# reflect the configuration the port actually ships.
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

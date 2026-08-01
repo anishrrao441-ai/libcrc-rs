@@ -20,6 +20,11 @@
 //! NULL for either argument being NULL (`src/nmea-chk.c`). Both behaviours are observable
 //! through the public API, so both are reproduced exactly.
 #![allow(non_snake_case)] // `checksum_NMEA` must match the C symbol exactly.
+// The C ABI dictates these signatures: libcrc's callers pass `(const unsigned char *,
+// size_t)`, so the exported functions must take raw pointers and cannot be marked
+// `unsafe` without breaking the ABI the original test suite links against. Every
+// dereference is guarded and justified individually in UNSAFE.md.
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use core::slice;
 

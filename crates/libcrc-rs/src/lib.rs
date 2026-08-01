@@ -27,10 +27,15 @@
 //! initialisation (`if (!crc_tab16_init) init_crc16_tab();`) is unsynchronised, with no
 //! atomics or locks anywhere in the library — undefined behaviour under C11 §5.1.2.4
 //! when two threads first call a CRC function concurrently.
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 
+mod combine;
+mod digest;
 mod tables;
+
+pub use combine::crc_32_combine;
+pub use digest::{Crc16Digest, Crc32Digest, Crc32Hasher, Crc64Digest};
 
 use tables::SHT75_CRC_TABLE;
 
@@ -165,7 +170,7 @@ static TABLE_DNP: [u16; 256] = reflected_table_u16(POLY_DNP);
 /// the RevEng catalogue.
 #[inline]
 const fn byteswap(crc: u16) -> u16 {
-    (crc >> 8) | (crc << 8)
+    crc.swap_bytes()
 }
 
 // ===========================================================================
@@ -234,13 +239,7 @@ pub const fn update_crc_sick(crc: u16, byte: u8, prev_byte: u8) -> u16 {
 
 /// CRC-8, Sensirion SHT7x table. libcrc `crc_8()`.
 pub fn crc_8(data: &[u8]) -> u8 {
-    let mut crc = START_8;
-    let mut i = 0;
-    while i < data.len() {
-        crc = update_crc_8(crc, data[i]);
-        i += 1;
-    }
-    crc
+    data.iter().fold(START_8, |crc, &b| update_crc_8(crc, b))
 }
 
 /// CRC-16/ARC. libcrc `crc_16()`. Check value for `b"123456789"` is `0xBB3D`.
@@ -254,34 +253,16 @@ pub fn crc_modbus(data: &[u8]) -> u16 {
 }
 
 fn fold_16(start: u16, data: &[u8]) -> u16 {
-    let mut crc = start;
-    let mut i = 0;
-    while i < data.len() {
-        crc = update_crc_16(crc, data[i]);
-        i += 1;
-    }
-    crc
+    data.iter().fold(start, |crc, &b| update_crc_16(crc, b))
 }
 
 /// CRC-32. libcrc `crc_32()`. Check value is `0xCBF43926`.
 pub fn crc_32(data: &[u8]) -> u32 {
-    let mut crc = START_32;
-    let mut i = 0;
-    while i < data.len() {
-        crc = update_crc_32(crc, data[i]);
-        i += 1;
-    }
-    crc ^ 0xFFFF_FFFF
+    data.iter().fold(START_32, |crc, &b| update_crc_32(crc, b)) ^ 0xFFFF_FFFF
 }
 
 fn fold_ccitt(start: u16, data: &[u8]) -> u16 {
-    let mut crc = start;
-    let mut i = 0;
-    while i < data.len() {
-        crc = update_crc_ccitt(crc, data[i]);
-        i += 1;
-    }
-    crc
+    data.iter().fold(start, |crc, &b| update_crc_ccitt(crc, b))
 }
 
 /// CRC-CCITT seeded with `0x1D0F`. libcrc `crc_ccitt_1d0f()`. Check value is `0xE5CC`.
@@ -304,13 +285,7 @@ pub fn crc_xmodem(data: &[u8]) -> u16 {
 /// Byte-swaps the final value, diverging from the RevEng catalogue: libcrc returns
 /// `0x8921` for `b"123456789"` where the catalogue specifies `0x2189`.
 pub fn crc_kermit(data: &[u8]) -> u16 {
-    let mut crc = START_KERMIT;
-    let mut i = 0;
-    while i < data.len() {
-        crc = update_crc_kermit(crc, data[i]);
-        i += 1;
-    }
-    byteswap(crc)
+    byteswap(data.iter().fold(START_KERMIT, |crc, &b| update_crc_kermit(crc, b)))
 }
 
 /// CRC-16/DNP. libcrc `crc_dnp()`.
@@ -318,13 +293,7 @@ pub fn crc_kermit(data: &[u8]) -> u16 {
 /// Complements *then* byte-swaps, diverging from the RevEng catalogue: libcrc returns
 /// `0x82EA` for `b"123456789"` where the catalogue specifies `0xEA82`.
 pub fn crc_dnp(data: &[u8]) -> u16 {
-    let mut crc = START_DNP;
-    let mut i = 0;
-    while i < data.len() {
-        crc = update_crc_dnp(crc, data[i]);
-        i += 1;
-    }
-    byteswap(!crc)
+    byteswap(!data.iter().fold(START_DNP, |crc, &b| update_crc_dnp(crc, b)))
 }
 
 /// CRC-16/SICK. libcrc `crc_sick()`. Check value is `0x56A6`.
@@ -333,37 +302,21 @@ pub fn crc_dnp(data: &[u8]) -> u16 {
 /// is no RevEng catalogue entry for this algorithm, so its only reference is libcrc
 /// itself — correctness rests entirely on byte-for-byte differential parity.
 pub fn crc_sick(data: &[u8]) -> u16 {
-    let mut crc = START_SICK;
-    let mut prev = 0u8;
-    let mut i = 0;
-    while i < data.len() {
-        crc = update_crc_sick(crc, data[i], prev);
-        prev = data[i];
-        i += 1;
-    }
+    // Carries the previous byte alongside the CRC; `0` for the first byte.
+    let (crc, _) = data
+        .iter()
+        .fold((START_SICK, 0u8), |(crc, prev), &b| (update_crc_sick(crc, b, prev), b));
     byteswap(crc)
 }
 
 /// CRC-64/ECMA. libcrc `crc_64_ecma()`.
 pub fn crc_64_ecma(data: &[u8]) -> u64 {
-    let mut crc = START_64_ECMA;
-    let mut i = 0;
-    while i < data.len() {
-        crc = update_crc_64(crc, data[i]);
-        i += 1;
-    }
-    crc
+    data.iter().fold(START_64_ECMA, |crc, &b| update_crc_64(crc, b))
 }
 
 /// CRC-64/WE. libcrc `crc_64_we()`. Same table as ECMA, different seed and final XOR.
 pub fn crc_64_we(data: &[u8]) -> u64 {
-    let mut crc = START_64_WE;
-    let mut i = 0;
-    while i < data.len() {
-        crc = update_crc_64(crc, data[i]);
-        i += 1;
-    }
-    crc ^ 0xFFFF_FFFF_FFFF_FFFF
+    data.iter().fold(START_64_WE, |crc, &b| update_crc_64(crc, b)) ^ 0xFFFF_FFFF_FFFF_FFFF
 }
 
 /// NMEA 0183 sentence checksum. libcrc `checksum_NMEA()`.
@@ -372,20 +325,13 @@ pub fn crc_64_we(data: &[u8]) -> u64 {
 /// function here this one is delimiter-driven rather than length-driven, so it takes the
 /// sentence bytes and stops on its own terminator.
 pub fn checksum_nmea(sentence: &[u8]) -> u8 {
-    let mut checksum = 0u8;
-    let mut i = 0;
-    if !sentence.is_empty() && sentence[0] == b'$' {
-        i = 1;
-    }
-    while i < sentence.len() {
-        let b = sentence[i];
-        if b == 0 || b == b'\r' || b == b'\n' || b == b'*' {
-            break;
-        }
-        checksum ^= b;
-        i += 1;
-    }
-    checksum
+    sentence
+        .strip_prefix(b"$")
+        .unwrap_or(sentence)
+        .iter()
+        .copied()
+        .take_while(|&b| !matches!(b, 0 | b'\r' | b'\n' | b'*'))
+        .fold(0u8, |checksum, b| checksum ^ b)
 }
 
 #[cfg(test)]

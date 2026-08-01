@@ -1,0 +1,32 @@
+-- c-shipped minimal
+303169684
+peak_working_set_bytes=3399680
+working_set_at_exit_bytes=28672
+peak_pagefile_bytes=647168
+page_faults=870
+wall_ns=13495400
+exit=0
+-- c-shipped work100m
+13739811645117257730
+peak_working_set_bytes=107778048
+working_set_at_exit_bytes=32768
+peak_pagefile_bytes=105590784
+page_faults=26530
+wall_ns=1754532300
+exit=0
+-- rust-native minimal
+303169684
+peak_working_set_bytes=3457024
+working_set_at_exit_bytes=32768
+peak_pagefile_bytes=655360
+page_faults=884
+wall_ns=11903000
+exit=0
+-- rust-native work100m
+13739811645117257730
+peak_working_set_bytes=107819008
+working_set_at_exit_bytes=32768
+peak_pagefile_bytes=105631744
+page_faults=26536
+wall_ns=1459426900
+exit=0
