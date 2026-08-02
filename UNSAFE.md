@@ -13,15 +13,19 @@ the prose.
 ```
 $ grep -rn "unsafe" crates/libcrc-rs/src/
 crates/libcrc-rs/src/lib.rs:1://! A zero-unsafe, `no_std` Rust port of [lammertb/libcrc](...)
-crates/libcrc-rs/src/lib.rs:31:#![forbid(unsafe_code)]
+crates/libcrc-rs/src/lib.rs:37://! compile time like the others, and all in safe Rust — no `unsafe`, no intrinsics, no
+crates/libcrc-rs/src/lib.rs:47:#![forbid(unsafe_code)]
+crates/libcrc-rs/src/slice8.rs:17://! Everything here is safe Rust. No `unsafe`, no intrinsics, no `target_feature`, no
+crates/libcrc-rs/src/slice8.rs:18://! CLMUL — the crate is `#![forbid(unsafe_code)]` and stays that way. The eight lookups
 
 $ grep -rnE "unsafe[[:space:]]*\{|unsafe fn|unsafe impl|unsafe trait" crates/libcrc-rs/
 (no output)
 ```
 
-Two textual matches: a doc comment, and the attribute that bans it. The second command
-looks for actual constructs and finds none — **zero `unsafe` blocks, zero `unsafe fn`,
-zero `unsafe impl`, zero `unsafe trait`.**
+Five textual matches: four prose doc-comments that contain the word "unsafe" while
+promising there is none, plus the attribute that bans it (`lib.rs:47`). The second
+command looks for actual `unsafe` **constructs** and finds none — **zero `unsafe`
+blocks, zero `unsafe fn`, zero `unsafe impl`, zero `unsafe trait`.**
 
 ### This is compiler-enforced, not a claim
 

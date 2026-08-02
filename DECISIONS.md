@@ -229,7 +229,7 @@ buffer, using GF(2) matrix exponentiation — `O(log n)` squarings instead of `O
 **Reason.** It makes chunked and parallel CRC possible, which matters for large files and
 multi-threaded hashing.
 
-**Tradeoffs.** Currently CRC-32 only. The same construction generalises to the other
+**Tradeoffs.** Covers 11 of 13 checksums (all reflected and forward CRC widths). The
 widths; not done because correctness on the 13 required algorithms came first.
 
 **Evidence.** Verified at **every split point** of a 513-byte buffer, plus three-way

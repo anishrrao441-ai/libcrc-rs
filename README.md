@@ -69,6 +69,49 @@ the original. We say so rather than implying a standard was followed.
 
 ---
 
+## The `crc` command-line tool
+
+The brief asks for a one-step build to a **binary**, so the workspace ships one. `crates/libcrc-cli`
+builds `crc`, which hashes files or stdin with any of the 13 algorithms and streams large inputs
+through the `Digest` types rather than reading them whole. Zero external dependencies.
+
+```
+$ printf '123456789' | crc --all -
+crc_8           0xA2                -
+crc_16          0xBB3D              -
+crc_modbus      0x4B37              -
+crc_sick        0x56A6              -
+crc_xmodem      0x31C3              -
+crc_ccitt_ffff  0x29B1              -
+crc_ccitt_1d0f  0xE5CC              -
+crc_kermit      0x8921              -
+crc_dnp         0x82EA              -
+crc_32          0xCBF43926          -
+crc_64_ecma     0x6C40DF5F0B497347  -
+crc_64_we       0x62EC59E3F1A4F00A  -
+nmea            0x31                -
+```
+
+`crc --list` names every algorithm; `crc --check MANIFEST` verifies a saved checksum list and exits
+non-zero on any mismatch; `--hex`/`--dec` pick the output base. It never panics on bad input —
+missing files, permission errors and empty input return a clean diagnostic and a non-zero exit.
+
+## Beyond the original: capabilities libcrc does not have
+
+- **`combine`** — `crc_*_combine(CRC(a), CRC(b), |b|)` returns `CRC(a‖b)` without re-reading either
+  buffer, via GF(2) matrix exponentiation (`O(log n)`). Generalised to **11 of the 13 checksums**
+  (all but `crc_sick`, whose fold depends on the previous byte, and NMEA, which is delimiter-driven).
+  This makes chunked and parallel hashing possible; the C API cannot.
+- **Streaming digests + `core::hash::Hasher`** — hash across arbitrary chunk boundaries, or drop the
+  port straight into `HashMap`. libcrc offers only one-shot and byte-at-a-time calls.
+- **Slice-by-8 bulk folding** — eight bytes per iteration through eight compile-time tables, in pure
+  safe Rust (no `unsafe`, no intrinsics). Default-on behind the `slice8` cargo feature; it costs
+  23,296 bytes of `.rodata`, and `--no-default-features` restores libcrc's exact byte-at-a-time loop.
+- **`no_std`, proven** — the port compiles for `thumbv7em-none-eabihf` (Cortex-M4F, bare metal, no
+  libstd exists), checked in CI (`.github/workflows/no-std.yml`). The claim is mechanical, not asserted.
+
+---
+
 ## Evidence
 
 | Claim | Where | Result |
@@ -227,8 +270,9 @@ assert_eq!(crc_32_combine(crc_32(a), crc_32(b), b.len()), crc_32(b"the quick bro
   trade: intrinsics require `unsafe`, and a provably zero-unsafe default build was judged
   more valuable than throughput on large buffers. If added, it must be behind an opt-in
   cargo feature so the default keeps that property.
-- **`crc_32_combine` is CRC-32 only.** The construction generalises to the other widths;
-  correctness on the 13 required algorithms came first.
+- **`combine` covers 11 of 13 checksums** (all but `crc_sick`, whose fold depends on the
+  previous byte, and NMEA, which is delimiter-driven). Not a limitation — a delivered feature
+  the C original lacks entirely.
 - **Benchmarks are single-machine.** One Windows laptop under a live workload. Ratios and
   orders of magnitude are meaningful; absolute numbers are not portable.
 - **`update_crc_32/64` parity is sampled, not exhaustive** — their domains are 2⁴⁰ and 2⁷².
