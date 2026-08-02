@@ -155,14 +155,25 @@ pub extern "C" fn checksum_NMEA(input_str: *const u8, result: *mut u8) -> *mut u
         return core::ptr::null_mut();
     }
 
-    // SAFETY: justified in UNSAFE.md (U-2). The C contract is a NUL-terminated string;
-    // the original walks the same bytes with the same assumption. We stop at the NUL, so
-    // we never read past the terminator the caller promised.
+    // SAFETY: justified in UNSAFE.md (U-2). The scan stops at the FIRST byte the
+    // original's own loop treats as a terminator — NUL, '*', CR or LF — so this shim
+    // reads exactly the bytes `src/nmea-chk.c` reads and not one more. An earlier
+    // version scanned to the NUL alone; on a real NMEA sentence the transmitted
+    // checksum FOLLOWS the '*', so a '*'-terminated buffer with no trailing NUL made
+    // the shim read past memory the original never touched (found by an adversarial
+    // review that reproduced an access violation at a guard page; the original
+    // returned 0x41 on the same buffer). '$' is not a terminator — the original
+    // reads and skips a leading '$', and `checksum_nmea` does the same with the slice.
     let mut len = 0usize;
-    while unsafe { *input_str.add(len) } != 0 {
+    loop {
+        let byte = unsafe { *input_str.add(len) };
+        if byte == 0 || byte == b'*' || byte == b'\r' || byte == b'\n' {
+            break;
+        }
         len += 1;
     }
-    // SAFETY: justified in UNSAFE.md (U-1). `len` was just measured up to the NUL.
+    // SAFETY: justified in UNSAFE.md (U-1). `len` was just measured, stopping at the
+    // first terminator; every byte in [0, len) was successfully read by the scan above.
     let sentence = unsafe { slice::from_raw_parts(input_str, len) };
 
     let checksum = libcrc_rs::checksum_nmea(sentence);
