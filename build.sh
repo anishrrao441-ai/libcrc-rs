@@ -87,9 +87,30 @@ if [ -n "$SHA256C" ]; then
     # this script already owns. No trap needed, so no trap to get wrong.
     MANIFEST="$BUILD_DIR/original.sha256.lf"
     tr -d '\r' < tests/original.sha256 > "$MANIFEST"
-    # shellcheck disable=SC2086  # $SHA256C is a command plus flags and must split.
-    $SHA256C "$MANIFEST" >/dev/null \
-        || fail "tests/original/ has been MODIFIED — refusing to build"
+    # A non-zero exit from the checker is NOT proof of tampering: the tool itself can
+    # crash (observed once: a transient msys2 fork() failure inside sha256sum, which an
+    # earlier version of this script reported as "tests MODIFIED" — the worst possible
+    # false accusation for this repo to make about itself). So: capture the output,
+    # retry once on failure, and only report tampering when the checker RAN and
+    # actually said FAILED. Anything else is a tool error, reported as a tool error,
+    # with the real output shown.
+    HASHLOG="$BUILD_DIR/hashcheck.log"
+    hash_ok=0
+    for attempt in 1 2; do
+        # shellcheck disable=SC2086  # $SHA256C is a command plus flags and must split.
+        if $SHA256C "$MANIFEST" >"$HASHLOG" 2>&1; then
+            hash_ok=1; break
+        fi
+        [ "$attempt" = 1 ] && sleep 1   # transient tool crashes clear on retry
+    done
+    if [ "$hash_ok" != 1 ]; then
+        cat "$HASHLOG" >&2
+        if grep -q "FAILED" "$HASHLOG"; then
+            fail "tests/original/ has been MODIFIED — refusing to build (checker output above)"
+        else
+            fail "the sha256 checker itself failed to run (output above) — this is a TOOL error, not evidence of tampering. Re-run ./build.sh; if it persists, verify manually: ${SHA256C} tests/original.sha256"
+        fi
+    fi
     ok "$(grep -c . "$MANIFEST") files match tests/original.sha256 (via ${SHA256C})"
 else
     printf '  no sha256 tool found (sha256sum / gsha256sum / shasum); skipping hash verification\n'
