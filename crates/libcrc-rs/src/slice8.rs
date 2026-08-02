@@ -81,8 +81,8 @@
 //! | `crc_32` | `[[u32; 256]; 7]` | 7168 B |
 //! | | **total** | **23 296 B** |
 //!
-//! 23 KiB of flash is nothing on a server and a great deal on a microcontroller, which
-//! is exactly libcrc's audience. So this whole module sits behind the **`slice8`**
+//! 22.75 KiB of flash is nothing on a server and a great deal on a microcontroller,
+//! which is exactly libcrc's audience. So this whole module sits behind the **`slice8`**
 //! cargo feature. It is on by default; `--no-default-features` compiles the identity
 //! shims at the bottom of this file instead, the byte-at-a-time path is restored
 //! verbatim, and not one byte of these tables is emitted. The full test suite is run

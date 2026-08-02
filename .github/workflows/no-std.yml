@@ -1,0 +1,44 @@
+name: no_std (bare metal)
+
+# Turns the crate's `no_std` claim from an assertion into a mechanical fact.
+#
+# `#![cfg_attr(not(test), no_std)]` proves nothing on a host target, where std exists
+# whether or not the crate asks for it. The proof is to compile for a target where std
+# does not exist at all: thumbv7em-none-eabihf (ARM Cortex-M4F, bare metal). rustup
+# ships core/alloc for that target and no libstd whatsoever, so if libcrc-rs compiles
+# for it, no_std holds by construction — any `use std::...` anywhere would fail with
+# E0433.
+#
+# VERIFIED LOCALLY before this workflow was written (both commands exit 0):
+#   cargo build -p libcrc-rs --target thumbv7em-none-eabihf
+#   cargo build -p libcrc-rs --target thumbv7em-none-eabihf --no-default-features
+#
+# Only -p libcrc-rs is built: libcrc-cabi and libcrc-cli use std by design (they are a
+# test harness and a command-line tool, not the port).
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bare-metal:
+    name: Build for Cortex-M4F (no std exists on this target)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          targets: thumbv7em-none-eabihf
+
+      - name: Build the port for bare metal (default features, slice8 on)
+        run: cargo build -p libcrc-rs --target thumbv7em-none-eabihf --release
+
+      - name: Build the minimal configuration (no default features)
+        run: cargo build -p libcrc-rs --target thumbv7em-none-eabihf --release --no-default-features

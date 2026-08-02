@@ -39,8 +39,8 @@
 //! every long one; the crossover is measured, not guessed. See [`slice8`] for the
 //! derivation, the exact memory cost, and why `crc_sick` is excluded.
 //!
-//! The extra tables cost 23 KiB of `.rodata`, which is free on a server and expensive on
-//! a microcontroller, so they sit behind the default-on `slice8` cargo feature. Building
+//! The extra tables cost 23,296 bytes of `.rodata` — free on a server, costly on a
+//! microcontroller — so they sit behind the default-on `slice8` cargo feature. Building
 //! with `--no-default-features` restores libcrc's original byte-at-a-time behaviour
 //! exactly and emits none of them.
 #![cfg_attr(not(test), no_std)]
