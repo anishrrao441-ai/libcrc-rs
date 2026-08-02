@@ -113,7 +113,12 @@ divergences 0
 
 ## What we found in the original
 
-Two defects, both reported upstream.
+Two defects, both **reported upstream during the hackathon window**:
+
+| Issue | Filed | Finding |
+|---|---|---|
+| [lammertb/libcrc#26](https://github.com/lammertb/libcrc/issues/26) | 2026-08-02 05:19 UTC | Data race in lazy table initialisation |
+| [lammertb/libcrc#27](https://github.com/lammertb/libcrc/issues/27) | 2026-08-02 05:19 UTC | `update_crc_64_ecma` declared but never defined |
 
 **1. The lazy table initialisation is a data race.** libcrc guards its table build with a
 plain non-atomic `bool`, and there is no synchronisation anywhere in the library. With 16

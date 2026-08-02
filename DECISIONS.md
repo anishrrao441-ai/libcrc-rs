@@ -67,7 +67,7 @@ silently return a wrong checksum. That is why it survived since 1999.
 **Alternative considered.** Adding a mutex or `Once` to mirror the original's structure.
 Rejected: it preserves the shape of a bug instead of deleting the bug.
 
-**Impact.** Filed upstream. The port is thread-safe with no synchronisation cost.
+**Impact.** Reported upstream as **[lammertb/libcrc#26](https://github.com/lammertb/libcrc/issues/26)** (filed 2026-08-02 05:19 UTC, inside the hackathon window). The port is thread-safe with no synchronisation cost, because there is nothing to synchronise.
 
 ---
 
@@ -213,7 +213,7 @@ hand-declare `update_crc_64` to call it at all.
 header documents it, so a user linking against the port would hit the same broken API for
 no benefit.
 
-**Impact.** Filed upstream. Bug report drafted with both the header and `nm` evidence.
+**Impact.** Reported upstream as **[lammertb/libcrc#27](https://github.com/lammertb/libcrc/issues/27)** (filed 2026-08-02 05:19 UTC, inside the hackathon window), with both the header citation and the `nm` output as evidence.
 
 ---
 
